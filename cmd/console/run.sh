@@ -9,5 +9,7 @@
 
 
 
-go run . ../../_capps/file_io_test.c --show-asm
+# go run . ../../_capps/file_io_test.c --show-asm
 
+
+go run . ../../_capps/send_message.c --show-asm

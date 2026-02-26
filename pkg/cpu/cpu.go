@@ -545,7 +545,7 @@ func (c *CPU) WriteMem(addr uint16, val uint16) {
 	c.Write16(addr, val)
 }
 
-func (c *CPU) readStringFromRAM(ptr uint16) (string, error) {
+func (c *CPU) ReadStringFromRAM(ptr uint16) (string, error) {
 	var chars []byte
 	for i := uint16(0); i < 17; i++ {
 		if int(ptr)+int(i) >= len(c.Memory) {
@@ -598,7 +598,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 
 	switch val {
 	case 1: // Read
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return
@@ -620,7 +620,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 		c.vfsStatus = 0 // Success
 
 	case 2: // Write
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return
@@ -642,7 +642,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 		c.vfsStatus = 0 // Success
 
 	case 3: // Get Size
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return
@@ -660,7 +660,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 		c.vfsStatus = 0 // Success
 
 	case 4: // Delete
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return
@@ -705,7 +705,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 		c.vfsStatus = 0 // Success
 
 	case 7: // GetMeta
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return
@@ -738,7 +738,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 		c.vfsStatus = 0 // Success
 
 	case 8: // ExecWait
-		filename, err := c.readStringFromRAM(filenamePtr)
+		filename, err := c.ReadStringFromRAM(filenamePtr)
 		if err != nil {
 			c.vfsStatus = 3 // Invalid Name
 			return

@@ -8,6 +8,7 @@ import (
 
 	"gocpu/pkg/compiler"
 	"gocpu/pkg/cpu"
+	"gocpu/pkg/peripherals"
 	"gocpu/pkg/utils"
 )
 
@@ -59,6 +60,8 @@ func main() {
 	}
 
 	vm := cpu.NewCPU("gocpu_vfs")
+	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
+
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")
 	}
