@@ -1,0 +1,140 @@
+=== GoCPU Benchmark Run ===
+Date      : Tue Feb 24 11:36:01 GMT 2026
+Benchtime : 3s
+Go version: go version go1.24.3 darwin/arm64
+Platform  : Darwin 24.2.0 arm64
+
+A65
+goos: darwin
+goarch: arm64
+pkg: gocpu/pkg/cpu
+cpu: Apple M2
+BenchmarkCPU_NOP-8         	  183081	     21052 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_ALU_ADD-8     	  152826	     23108 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_ALU_MUL-8     	  155884	     22938 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_ALU_DIV-8     	  146204	     23451 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_Memory_LD-8   	  119730	     29712 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_Memory_ST-8   	  126596	     28178 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_FILL-8        	  200847	     17791 ns/op	  204960 B/op	       4 allocs/op
+BenchmarkCPU_COPY-8        	  116660	     30791 ns/op	  204961 B/op	       4 allocs/op
+BenchmarkCPU_Call_Ret-8    	  109231	     32815 ns/op	  204961 B/op	       4 allocs/op
+BenchmarkCPU_Fibonacci-8   	  250002	     14582 ns/op	  204961 B/op	       4 allocs/op
+PASS
+ok  	gocpu/pkg/cpu	38.657s
+    JMP __init
+    .ORG 0x0010
+    RETI
+__init:
+    CALL main
+    HLT
+
+    JMP L0
+main:
+    PUSH R2
+    LDSP R2
+    LDI R1, 8
+    LDSP R3
+    SUB R3, R1
+    STSP R3
+; var x (size 1) at offset -2
+    LDI R0, 1
+    PUSH R0
+    LDI R0, 2
+    POP  R1
+    ADD R1, R0
+    MOV R0, R1
+    MOV R1, R2
+    LDI R3, 65534
+    ADD R1, R3
+    ST  [R1], R0
+; var y (size 1) at offset -4
+    MOV R1, R2        ; FP
+    LDI R3, 65534
+    ADD R1, R3        ; &x (local/param)
+    LD  R0, [R1]
+    PUSH R0
+    LDI R0, 1
+    POP  R1
+    SUB R1, R0
+    MOV R0, R1
+    MOV R1, R2
+    LDI R3, 65532
+    ADD R1, R3
+    ST  [R1], R0
+; var z (size 1) at offset -6
+    MOV R1, R2        ; FP
+    LDI R3, 65534
+    ADD R1, R3        ; &x (local/param)
+    LD  R0, [R1]
+    PUSH R0
+    MOV R1, R2        ; FP
+    LDI R3, 65532
+    ADD R1, R3        ; &y (local/param)
+    LD  R0, [R1]
+    POP  R1
+    SUB R1, R0
+    LDI R0, 1
+    JZ  L1
+    LDI R0, 0
+L1:
+    MOV R1, R2
+    LDI R3, 65530
+    ADD R1, R3
+    ST  [R1], R0
+; var w (size 1) at offset -8
+    LDI R0, 1
+    PUSH R0
+    LDI R0, 2
+    POP  R1
+    ADD R1, R0
+    MOV R0, R1
+    PUSH R0
+    LDI R0, 3
+    POP  R1
+    SUB R1, R0
+    LDI R0, 1
+    JZ  L2
+    LDI R0, 0
+L2:
+    MOV R1, R2
+    LDI R3, 65528
+    ADD R1, R3
+    ST  [R1], R0
+; return z
+    MOV R1, R2        ; FP
+    LDI R3, 65530
+    ADD R1, R3        ; &z (local/param)
+    LD  R0, [R1]
+    STSP R2
+    POP R2
+    RET
+    STSP R2
+    POP R2
+    RET
+L0:
+
+    HLT
+
+goos: darwin
+goarch: arm64
+pkg: gocpu/compiler
+cpu: Apple M2
+BenchmarkLex_Simple-8                 	 1508919	      2390 ns/op	    4960 B/op	      26 allocs/op
+BenchmarkLex_Complex-8                	  137400	     26118 ns/op	   43808 B/op	     222 allocs/op
+BenchmarkParse_Simple-8               	 3647356	       988.1 ns/op	     692 B/op	      24 allocs/op
+BenchmarkParse_Complex-8              	  231858	     15438 ns/op	    9704 B/op	     309 allocs/op
+BenchmarkGenerate_Simple-8            	  493330	      7270 ns/op	    5474 B/op	      43 allocs/op
+BenchmarkGenerate_Complex-8           	   33771	    106006 ns/op	   77783 B/op	     407 allocs/op
+BenchmarkCompilerPipeline_Simple-8    	  321354	     11096 ns/op	   11141 B/op	      93 allocs/op
+BenchmarkCompilerPipeline_Complex-8   	   23858	    150586 ns/op	  131328 B/op	     938 allocs/op
+PASS
+ok  	gocpu/compiler	37.366s
+goos: darwin
+goarch: arm64
+pkg: gocpu/pkg/asm
+cpu: Apple M2
+BenchmarkAssemble_Small-8    	  377419	      9230 ns/op	    7280 B/op	      92 allocs/op
+BenchmarkAssemble_Medium-8   	   67275	     53477 ns/op	   40160 B/op	     471 allocs/op
+BenchmarkAssemble_Large-8    	   16303	    222442 ns/op	  164770 B/op	    1907 allocs/op
+PASS
+ok  	gocpu/pkg/asm	13.840s

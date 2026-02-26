@@ -1,0 +1,7 @@
+all.sh
+all
+gocpu-web/public/main.wasm
+./desktop
+cmd/desktop/gocpu_vfs
+cmd/console/gocpu_vfs/TEST.TXT
+.DS_Store

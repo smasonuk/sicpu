@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "Bash(GOOS=js GOARCH=wasm go build:*)",
+      "Bash(go build:*)",
+      "Bash(wc:*)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}
