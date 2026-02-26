@@ -289,6 +289,261 @@ All MMIO ports occupy `0xFF00`–`0xFF1F`. Use `ST [Rport], Rdata` to write and 
 
 ---
 
+## Peripherals and Expansion Bus
+
+The CPU supports up to 16 peripheral devices connected via the **Expansion Bus**, which occupies the MMIO address range `0xFC00`–`0xFCFF`. Each slot is 16 bytes wide.
+
+### Address Mapping
+
+| Slot | Address Range | Size (bytes) | Description                |
+|------|---------------|--------------|----------------------------|
+| 0    | `0xFC00`–`0xFC0F` | 16    | Peripheral slot 0           |
+| 1    | `0xFC10`–`0xFC1F` | 16    | Peripheral slot 1           |
+| ...  | ...           | ...          | ...                         |
+| 15   | `0xFCF0`–`0xFCFF` | 16    | Peripheral slot 15          |
+
+Each slot can hold a peripheral implementing the `Peripheral` interface.
+
+### Peripheral Interface
+
+All peripherals must implement the following interface (in Go):
+
+```go
+type Peripheral interface {
+    // Read16(offset uint16) uint16
+    // Reads a 16-bit value at the given offset (0–15) within the slot.
+    
+    // Write16(offset uint16, val uint16)
+    // Writes a 16-bit value at the given offset (0–15) within the slot.
+    
+    // Step()
+    // Called on every CPU step. Allows asynchronous hardware behavior.
+}
+```
+
+### Using Peripherals from Assembly/C
+
+Peripherals are accessed like any other MMIO device via `LD`/`ST` instructions:
+
+```asm
+; Read from peripheral in slot 2, offset 0x04
+LD  R0, [0xFC24]     ; 0xFC20 + 0x04
+
+; Write to peripheral in slot 2, offset 0x00
+LDI R1, 42
+ST  [0xFC20], R1     ; 0xFC20 + 0x00
+
+; Byte access
+LDB R0, [0xFC21]     ; Read low byte from slot 2, offset 0x00
+STB [0xFC21], R1     ; Write low byte to slot 2, offset 0x00
+```
+
+### Built-in Peripherals
+
+#### 1. DMA Tester (`DMATester`)
+
+A simple **Direct Memory Access** (DMA) controller for testing hardware transfers.
+
+**Registers (offsets within slot):**
+
+| Offset | R/W        | Description                                       |
+|--------|------------|---------------------------------------------------|
+| 0x00   | Write      | Command register: write `1` to trigger DMA         |
+| 0x02   | Read/Write | Target address (destination)                       |
+| 0x04   | Read/Write | Transfer length (in bytes)                         |
+
+**Example (Assembly):**
+
+```asm
+; Mount DMA in slot 1 and transfer 16 bytes to address 0x1000
+LDI R0, 0x1000      ; target address
+ST  [0xFC12], R0    ; write to slot 1, offset 0x02
+
+LDI R0, 16          ; length
+ST  [0xFC14], R0    ; write to slot 1, offset 0x04
+
+LDI R0, 1           ; trigger command
+ST  [0xFC10], R0    ; write to slot 1, offset 0x00 (fires interrupt)
+```
+
+The DMA peripheral fills the target region with `0xAA` bytes and triggers a **peripheral interrupt** (slot 1, bit mask `0x0002`) when complete.
+
+#### 2. Message Peripheral (`MessagePeripheral`)
+
+A peripheral that sends formatted messages to the host output. Useful for inter-process communication or debugging.
+
+**Registers (offsets within slot):**
+
+| Offset | R/W        | Description                                       |
+|--------|------------|---------------------------------------------------|
+| 0x00   | Write      | Control: write `1` to send message                 |
+| 0x02   | Read/Write | Target address (null-terminated recipient string)  |
+| 0x04   | Read/Write | Body/data address (message content)                |
+| 0x06   | Read/Write | Body length (in bytes)                             |
+
+**Example (Assembly):**
+
+```asm
+; Send message to "system" with body "hello"
+
+; Write target string at 0x1000
+.ORG 0x1000
+TARGET: .STRING "system"
+
+; Write message body at 0x1010
+.ORG 0x1010
+BODY: .STRING "hello"
+
+; Configure and send
+.ORG 0x0100
+    LDI R0, 0x1000      ; target address
+    ST  [0xFC02], R0
+
+    LDI R0, 0x1010      ; body address
+    ST  [0xFC04], R0
+
+    LDI R0, 5           ; body length
+    ST  [0xFC06], R0
+
+    LDI R0, 1           ; send
+    ST  [0xFC00], R0
+```
+
+Output (host stdout):
+```
+[Message HW] To: system | Body: hello
+```
+
+### Interrupts from Peripherals
+
+Peripherals can trigger interrupts by calling `cpu.TriggerPeripheralInterrupt(slot)`.
+
+**From Go:**
+
+```go
+// In your custom Peripheral implementation:
+func (p *MyPeripheral) someMethod() {
+    // ... do work ...
+    p.cpu.TriggerPeripheralInterrupt(p.slot)
+}
+```
+
+**From assembly, handling a peripheral interrupt:**
+
+```asm
+JMP MAIN
+
+; Interrupt vector
+.ORG 0x0010
+ISR:
+    ; R0 = read interrupt mask register
+    LD  R0, [0xFF09]
+    
+    ; Check if slot 1 fired (bit 1)
+    LDI R1, 0x0002
+    AND R0, R1
+    JZ  ISR_END
+    
+    ; Handle slot 1 interrupt...
+    ; ... (call handler, etc.)
+    
+    ; Clear interrupt flag
+    LDI R1, 0x0002
+    ST  [0xFF09], R1    ; write-to-clear
+    
+ISR_END:
+    RETI
+
+MAIN:
+    EI                  ; enable interrupts
+    LOOP:
+        WFI             ; wait for interrupt
+        JMP LOOP
+```
+
+**Interrupt Mask Register (MMIO `0xFF09`):**
+
+| Bit | Value | Slot |
+|-----|-------|------|
+| 0   | 0x0001 | Slot 0 |
+| 1   | 0x0002 | Slot 1 |
+| 2   | 0x0004 | Slot 2 |
+| ... | ...   | ...   |
+| 15  | 0x8000 | Slot 15 |
+
+Writing a bit value to `0xFF09` clears the corresponding interrupt flag.
+
+### Implementing a Custom Peripheral
+
+Create a struct that implements the `Peripheral` interface:
+
+```go
+package myapp
+
+import (
+    "gocpu/pkg/cpu"
+)
+
+type MyPeripheral struct {
+    c    *cpu.CPU
+    slot uint8
+    
+    // Your registers
+    statusReg uint16
+    dataReg   uint16
+}
+
+func NewMyPeripheral(c *cpu.CPU, slot uint8) *MyPeripheral {
+    return &MyPeripheral{
+        c:    c,
+        slot: slot,
+    }
+}
+
+func (p *MyPeripheral) Read16(offset uint16) uint16 {
+    switch offset {
+    case 0x00:
+        return p.statusReg
+    case 0x02:
+        return p.dataReg
+    }
+    return 0
+}
+
+func (p *MyPeripheral) Write16(offset uint16, val uint16) {
+    switch offset {
+    case 0x00:
+        p.statusReg = val
+        if val == 1 {
+            p.doSomething()
+        }
+    case 0x02:
+        p.dataReg = val
+    }
+}
+
+func (p *MyPeripheral) Step() {
+    // Called every CPU cycle; use for async behavior
+}
+
+func (p *MyPeripheral) doSomething() {
+    // Perform work...
+    
+    // Trigger an interrupt when done
+    p.c.TriggerPeripheralInterrupt(p.slot)
+}
+```
+
+Then mount it:
+
+```go
+c := cpu.NewCPU()
+myPeripheral := NewMyPeripheral(c, 3)
+c.MountPeripheral(3, myPeripheral)
+```
+
+---
+
 ## Assembler Directives
 
 | Directive          | Description                                                                 |
