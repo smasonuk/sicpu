@@ -6,9 +6,8 @@ import (
 )
 
 type MessagePeripheral struct {
-	c    *cpu.CPU
-	slot uint8
-
+	c        *cpu.CPU
+	slot     uint8
 	toAddr   uint16
 	bodyAddr uint16
 	bodyLen  uint16

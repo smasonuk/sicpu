@@ -48,6 +48,7 @@ void set_palette(int index, int rgb565) {
     *PALETTE_DATA = rgb565;
 }
 
+//DOES this work?
 int draw_pixel_8bpp(int x, int y, byte color_index) {
     byte* vram = 0x8000;
     *(vram + (y * 128) + x) = color_index;

@@ -192,6 +192,7 @@ func main() {
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)
 	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
+	vm.MountPeripheral(1, peripherals.NewCameraPeripheral(vm, 1))
 
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")
