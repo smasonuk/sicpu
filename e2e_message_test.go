@@ -53,7 +53,7 @@ func TestSendMessageIntegration(t *testing.T) {
 	output := buf.String()
 
 	// 8. Assertions
-	expectedMessage := "[Message HW] To: Central Command | Body: deadbeef\n"
+	expectedMessage := "[Message HW] To: Central Command | Body: Ground control to major Tom\n"
 	if !strings.Contains(output, expectedMessage) {
 		t.Errorf("Expected peripheral output %q, got %q", expectedMessage, output)
 	}
