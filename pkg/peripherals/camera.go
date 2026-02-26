@@ -64,6 +64,8 @@ func (cam *CameraPeripheral) Write16(offset uint16, val uint16) {
 	}
 }
 
+func (cam *CameraPeripheral) Type() string { return "CameraPeripheral" }
+
 func (cam *CameraPeripheral) Step() {}
 
 // capture renders a test image into CPU RAM at bufAddr.

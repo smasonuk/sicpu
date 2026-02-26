@@ -34,6 +34,21 @@ func (g *Game) Update() error {
 		g.vm.PushKey(8) // ASCII backspace
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		if err := g.vm.HibernateToFile("save_state.zip"); err != nil {
+			fmt.Printf("[Hibernate] Save failed: %v\n", err)
+		} else {
+			fmt.Println("[Hibernate] State saved to save_state.zip")
+		}
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF9) {
+		if err := g.vm.RestoreFromFile("save_state.zip"); err != nil {
+			fmt.Printf("[Hibernate] Load failed: %v\n", err)
+		} else {
+			fmt.Println("[Hibernate] State restored from save_state.zip")
+		}
+	}
+
 	// Run at a fixed, maximum clock speed (e.g. ~60 MHz at 60fps)
 	for i := 0; i < 10000; i++ {
 		// Break early if the program finishes or goes to sleep!
@@ -188,6 +203,14 @@ func main() {
 	if showAsm {
 		print("Generated Assembly:\n", *asm, "\n")
 	}
+
+	// Register peripheral factories for hibernation restore.
+	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewMessagePeripheral(c, slot)
+	})
+	cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewDMATester(c, slot)
+	})
 
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)

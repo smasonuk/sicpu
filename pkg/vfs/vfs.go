@@ -30,7 +30,7 @@ type FileEntry struct {
 
 // VirtualDisk represents an in-memory virtual file system.
 type VirtualDisk struct {
-	mu         sync.RWMutex
+	Mu         sync.RWMutex
 	Files      map[string]*FileEntry
 	DirtyFiles map[string]bool
 	UsedBytes  int
@@ -50,8 +50,8 @@ func NewVirtualDisk() *VirtualDisk {
 // It validates the filename, checks for disk quota, and deep copies the data.
 // If the file already exists, it is overwritten, and the quota usage is updated accordingly.
 func (vd *VirtualDisk) Write(filename string, data []byte) error {
-	vd.mu.Lock()
-	defer vd.mu.Unlock()
+	vd.Mu.Lock()
+	defer vd.Mu.Unlock()
 
 	if !validFilename.MatchString(filename) {
 		return ErrInvalidFilename
@@ -92,8 +92,8 @@ func (vd *VirtualDisk) Write(filename string, data []byte) error {
 // Read reads data from a file on the virtual disk.
 // It returns the file data if it exists, or an error if the file is not found or the filename is invalid.
 func (vd *VirtualDisk) Read(filename string) ([]byte, error) {
-	vd.mu.RLock()
-	defer vd.mu.RUnlock()
+	vd.Mu.RLock()
+	defer vd.Mu.RUnlock()
 
 	if !validFilename.MatchString(filename) {
 		return nil, ErrInvalidFilename
@@ -110,8 +110,8 @@ func (vd *VirtualDisk) Read(filename string) ([]byte, error) {
 // Size returns the size of a file in bytes.
 // It returns an error if the file is not found or the filename is invalid.
 func (vd *VirtualDisk) Size(filename string) (int, error) {
-	vd.mu.RLock()
-	defer vd.mu.RUnlock()
+	vd.Mu.RLock()
+	defer vd.Mu.RUnlock()
 
 	if !validFilename.MatchString(filename) {
 		return 0, ErrInvalidFilename
@@ -127,8 +127,8 @@ func (vd *VirtualDisk) Size(filename string) (int, error) {
 
 // Delete removes a file from the virtual disk.
 func (vd *VirtualDisk) Delete(filename string) error {
-	vd.mu.Lock()
-	defer vd.mu.Unlock()
+	vd.Mu.Lock()
+	defer vd.Mu.Unlock()
 
 	if !validFilename.MatchString(filename) {
 		return ErrInvalidFilename
@@ -151,15 +151,15 @@ func (vd *VirtualDisk) Delete(filename string) error {
 
 // FreeSpace returns the number of free bytes on the disk.
 func (vd *VirtualDisk) FreeSpace() int {
-	vd.mu.RLock()
-	defer vd.mu.RUnlock()
+	vd.Mu.RLock()
+	defer vd.Mu.RUnlock()
 	return MaxDiskBytes - vd.UsedBytes
 }
 
 // List returns a sorted list of all filenames in the VFS.
 func (vd *VirtualDisk) List() []string {
-	vd.mu.RLock()
-	defer vd.mu.RUnlock()
+	vd.Mu.RLock()
+	defer vd.Mu.RUnlock()
 
 	keys := make([]string, 0, len(vd.Files))
 	for k := range vd.Files {
@@ -171,8 +171,8 @@ func (vd *VirtualDisk) List() []string {
 
 // GetMeta returns the creation and modification time of a file.
 func (vd *VirtualDisk) GetMeta(filename string) (time.Time, time.Time, error) {
-	vd.mu.RLock()
-	defer vd.mu.RUnlock()
+	vd.Mu.RLock()
+	defer vd.Mu.RUnlock()
 
 	if !validFilename.MatchString(filename) {
 		return time.Time{}, time.Time{}, ErrInvalidFilename
@@ -198,8 +198,8 @@ func (vd *VirtualDisk) LoadFrom(path string) error {
 		return err
 	}
 
-	vd.mu.Lock()
-	defer vd.mu.Unlock()
+	vd.Mu.Lock()
+	defer vd.Mu.Unlock()
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -245,7 +245,7 @@ func (vd *VirtualDisk) PersistTo(path string) error {
 	}
 
 	// Snapshot the dirty files under a write lock (to clear flags), then release before doing I/O.
-	vd.mu.Lock()
+	vd.Mu.Lock()
 	snapshot := make(map[string]*FileEntry)
 	deletedFiles := make([]string, 0)
 
@@ -268,7 +268,7 @@ func (vd *VirtualDisk) PersistTo(path string) error {
 	if len(vd.DirtyFiles) == 0 {
 		vd.Dirty = false
 	}
-	vd.mu.Unlock()
+	vd.Mu.Unlock()
 
 	var firstErr error
 
@@ -286,10 +286,10 @@ func (vd *VirtualDisk) PersistTo(path string) error {
 	for name, entry := range snapshot {
 		if err := os.WriteFile(filepath.Join(path, name), entry.Data, 0644); err != nil {
 			// Restore dirty flag on failure
-			vd.mu.Lock()
+			vd.Mu.Lock()
 			vd.DirtyFiles[name] = true
 			vd.Dirty = true
-			vd.mu.Unlock()
+			vd.Mu.Unlock()
 			if firstErr == nil {
 				firstErr = err
 			}

@@ -61,6 +61,8 @@ func (d *DMATester) performDMA() {
 	d.c.TriggerPeripheralInterrupt(d.slot)
 }
 
+func (d *DMATester) Type() string { return "DMATester" }
+
 func (d *DMATester) Step() {
 	// No background task for this tester
 }

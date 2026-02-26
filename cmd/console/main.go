@@ -61,6 +61,14 @@ func main() {
 		print("Generated Assembly:\n", *asm, "\n")
 	}
 
+	// Register peripheral factories for hibernation restore.
+	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewMessagePeripheral(c, slot)
+	})
+	cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewDMATester(c, slot)
+	})
+
 	vm := cpu.NewCPU("gocpu_vfs")
 	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
 

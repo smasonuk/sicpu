@@ -1,6 +1,7 @@
 package peripherals
 
 import (
+	"encoding/binary"
 	"fmt"
 	"gocpu/pkg/cpu"
 )
@@ -19,6 +20,8 @@ func NewMessagePeripheral(c *cpu.CPU, slot uint8) *MessagePeripheral {
 		slot: slot,
 	}
 }
+
+func (m *MessagePeripheral) Type() string { return "MessagePeripheral" }
 
 func (m *MessagePeripheral) Read16(offset uint16) uint16 {
 	if offset >= 0x08 && offset <= 0x0E {
@@ -54,6 +57,26 @@ func (m *MessagePeripheral) Write16(offset uint16, val uint16) {
 
 func (m *MessagePeripheral) Step() {
 	// Synchronous peripheral, no step needed
+}
+
+// SaveState serialises toAddr, bodyAddr, and bodyLen as 6 little-endian bytes.
+func (m *MessagePeripheral) SaveState() []byte {
+	buf := make([]byte, 6)
+	binary.LittleEndian.PutUint16(buf[0:], m.toAddr)
+	binary.LittleEndian.PutUint16(buf[2:], m.bodyAddr)
+	binary.LittleEndian.PutUint16(buf[4:], m.bodyLen)
+	return buf
+}
+
+// LoadState restores toAddr, bodyAddr, and bodyLen from the 6-byte payload.
+func (m *MessagePeripheral) LoadState(data []byte) error {
+	if len(data) < 6 {
+		return fmt.Errorf("MessagePeripheral.LoadState: need 6 bytes, got %d", len(data))
+	}
+	m.toAddr = binary.LittleEndian.Uint16(data[0:])
+	m.bodyAddr = binary.LittleEndian.Uint16(data[2:])
+	m.bodyLen = binary.LittleEndian.Uint16(data[4:])
+	return nil
 }
 
 func (m *MessagePeripheral) sendMessage() {
