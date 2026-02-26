@@ -14,6 +14,7 @@ import (
 	"gocpu/pkg/compiler"
 	"gocpu/pkg/cpu"
 	"gocpu/pkg/grid"
+	"gocpu/pkg/peripherals"
 	"gocpu/pkg/utils"
 )
 
@@ -190,6 +191,8 @@ func main() {
 
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)
+	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
+
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")
 	}
