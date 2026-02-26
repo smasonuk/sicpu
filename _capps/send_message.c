@@ -1,6 +1,6 @@
 #include "../lib/stdio.c"
 
-int* MSG_CMD = 0xFC00;
+int* MSG_CMD = 0xFC00; //writing into slot 1
 int* MSG_TO  = 0xFC02;
 int* MSG_BODY = 0xFC04;
 int* MSG_LEN = 0xFC06;
