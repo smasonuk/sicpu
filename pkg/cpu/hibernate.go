@@ -58,7 +58,7 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 
-	// ── 1. cpu_state.json ──────────────────────────────────────────────────
+	//  1. cpu_state.json
 	state := humanReadableState{
 		Regs:               c.Regs,
 		PC:                 c.PC,
@@ -98,12 +98,12 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	// ── 2. memory.bin ──────────────────────────────────────────────────────
+	//  2. memory.bin
 	if err := writeZipEntry(zw, "memory.bin", c.Memory[:]); err != nil {
 		return nil, err
 	}
 
-	// ── 3. Graphics banks ──────────────────────────────────────────────────
+	//  3. Graphics banks
 	for i := 0; i < 4; i++ {
 		if err := writeZipEntry(zw, fmt.Sprintf("graphics_bank_%d.bin", i), c.GraphicsBanks[i][:]); err != nil {
 			return nil, err
@@ -113,7 +113,7 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 		}
 	}
 
-	// ── 4. Text VRAM (uint16 arrays → little-endian bytes) ─────────────────
+	//  4. Text VRAM (uint16 arrays → little-endian bytes)
 	textVRAMBytes := uint16SliceToLE(c.TextVRAM[:])
 	if err := writeZipEntry(zw, "text_vram.bin", textVRAMBytes); err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	// ── 5. VFS snapshot ────────────────────────────────────────────────────
+	//  5. VFS snapshot
 	if c.Disk != nil {
 		c.Disk.Mu.RLock()
 
@@ -157,7 +157,7 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 		c.Disk.Mu.RUnlock()
 	}
 
-	// ── 6. Peripheral state bins ───────────────────────────────────────────
+	//  6. Peripheral state bins
 	for i, p := range c.Peripherals {
 		if p == nil {
 			continue
@@ -189,7 +189,7 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 		fileMap[f.Name] = f
 	}
 
-	// ── 1. cpu_state.json ──────────────────────────────────────────────────
+	//  1. cpu_state.json
 	jsonData, err := readZipEntry(fileMap, "cpu_state.json")
 	if err != nil {
 		return err
@@ -221,12 +221,12 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 	c.Palette = state.Palette
 	c.PaletteIndex = state.PaletteIndex
 
-	// ── 2. memory.bin ──────────────────────────────────────────────────────
+	//  2. memory.bin
 	if memData, err := readZipEntry(fileMap, "memory.bin"); err == nil {
 		copy(c.Memory[:], memData)
 	}
 
-	// ── 3. Graphics banks ──────────────────────────────────────────────────
+	//  3. Graphics banks
 	for i := 0; i < 4; i++ {
 		if d, err := readZipEntry(fileMap, fmt.Sprintf("graphics_bank_%d.bin", i)); err == nil {
 			copy(c.GraphicsBanks[i][:], d)
@@ -236,7 +236,7 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 		}
 	}
 
-	// ── 4. Text VRAM ───────────────────────────────────────────────────────
+	//  4. Text VRAM
 	if raw, err := readZipEntry(fileMap, "text_vram.bin"); err == nil {
 		leToUint16Slice(raw, c.TextVRAM[:])
 	}
@@ -244,7 +244,7 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 		leToUint16Slice(raw, c.TextVRAM_Front[:])
 	}
 
-	// ── 5. VFS ─────────────────────────────────────────────────────────────
+	//  5. VFS
 	if metaJSON, err := readZipEntry(fileMap, "vfs_metadata.json"); err == nil {
 		var meta vfsMetadata
 		if err := json.Unmarshal(metaJSON, &meta); err != nil {
@@ -283,7 +283,7 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 		c.Disk.Mu.Unlock()
 	}
 
-	// ── 6. Peripherals ─────────────────────────────────────────────────────
+	//  6. Peripherals
 	for slot, typeName := range state.MountedPeripherals {
 		factory, ok := peripheralRegistry[typeName]
 		if !ok {
@@ -323,7 +323,7 @@ func (c *CPU) RestoreFromFile(path string) error {
 	return c.RestoreFromBytes(data)
 }
 
-// ── helpers ────────────────────────────────────────────────────────────────
+//  helpers
 
 func writeZipEntry(zw *zip.Writer, name string, data []byte) error {
 	w, err := zw.Create(name)

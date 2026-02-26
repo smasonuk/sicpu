@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// ── Ticket 1: Core state round-trip ────────────────────────────────────────
-
 func TestCPU_HibernateCoreState(t *testing.T) {
 	c1 := NewCPU()
 	c1.Regs[0] = 0x1234
@@ -108,8 +106,6 @@ func TestCPU_HibernateCoreState(t *testing.T) {
 	}
 }
 
-// ── Ticket 2: Memory & VRAM binary serialisation ───────────────────────────
-
 func TestCPU_HibernateMemory(t *testing.T) {
 	c1 := NewCPU()
 
@@ -166,8 +162,6 @@ func TestCPU_HibernateMemory(t *testing.T) {
 	}
 }
 
-// ── Ticket 3: VFS state export & import ────────────────────────────────────
-
 func TestCPU_HibernateVFS(t *testing.T) {
 	c1 := NewCPU()
 
@@ -219,17 +213,15 @@ func TestCPU_HibernateVFS(t *testing.T) {
 	}
 }
 
-// ── Ticket 4: Peripheral registry & state restoration ─────────────────────
-
 // mockStatefulPeripheral is a minimal Peripheral + StatefulPeripheral used in tests.
 type mockStatefulPeripheral struct {
 	value uint16
 }
 
-func (m *mockStatefulPeripheral) Read16(_ uint16) uint16  { return m.value }
+func (m *mockStatefulPeripheral) Read16(_ uint16) uint16     { return m.value }
 func (m *mockStatefulPeripheral) Write16(_ uint16, v uint16) { m.value = v }
-func (m *mockStatefulPeripheral) Step()                    {}
-func (m *mockStatefulPeripheral) Type() string             { return "MockStateful" }
+func (m *mockStatefulPeripheral) Step()                      {}
+func (m *mockStatefulPeripheral) Type() string               { return "MockStateful" }
 
 func (m *mockStatefulPeripheral) SaveState() []byte {
 	b := make([]byte, 2)
@@ -279,8 +271,6 @@ func TestCPU_HibernatePeripherals(t *testing.T) {
 	}
 }
 
-// ── Ticket 5: End-to-end execution resume ─────────────────────────────────
-
 func TestCPU_HibernateAndResume(t *testing.T) {
 	// Program: infinite counter — R3 increments by 1 each loop iteration.
 	//   addr 0: LDI R0, <immediate>   (2 words = 4 bytes)
@@ -289,8 +279,8 @@ func TestCPU_HibernateAndResume(t *testing.T) {
 	c1 := NewCPU()
 	loadProgram(c1,
 		EncodeInstruction(OpLDI, 0, 0, 0), 1, // LDI R0, 1
-		EncodeInstruction(OpADD, 3, 0, 0),     // ADD R3, R0
-		EncodeInstruction(OpJMP, 0, 0, 0), 4,  // JMP → addr 4
+		EncodeInstruction(OpADD, 3, 0, 0),    // ADD R3, R0
+		EncodeInstruction(OpJMP, 0, 0, 0), 4, // JMP → addr 4
 	)
 
 	// Run 50 steps on the original CPU.
