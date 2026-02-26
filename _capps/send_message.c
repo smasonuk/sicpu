@@ -14,13 +14,11 @@ void send_msg(byte* to, byte* body, int len) {
 
 int main() {
     byte* target = "Central Command";
-    byte payload[4];
-    payload[0] = 0xDE;
-    payload[1] = 0xAD;
-    payload[2] = 0xBE;
-    payload[3] = 0xEF;
 
-    send_msg(target, payload, 4);
+    byte* payload = "Ground control to major Tom"; // This will set the first 4 bytes of payload to 'A', 'B', 'C', 'D'
+    int len = strlen(payload);
+
+    send_msg(target, payload, len);
 
     print("Message sent!\n");
     return 0;

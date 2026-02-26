@@ -64,7 +64,12 @@ func (m *MessagePeripheral) sendMessage() {
 	body := make([]byte, m.bodyLen)
 	for i := uint16(0); i < m.bodyLen; i++ {
 		body[i] = m.c.ReadByte(m.bodyAddr + i)
+		fmt.Printf("[Message HW] Read byte %d: 0x%02X, ascii: '%c', decimal: %d\n", i, body[i], body[i], body[i])
 	}
 
-	fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+	// fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+
+	bodyStr := string(body)
+
+	fmt.Printf("[Message HW] To: %s | Body: %s\n", target, bodyStr)
 }
