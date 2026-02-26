@@ -1,3 +1,11 @@
+#include "stdio.c"
+
+int* MSG_CMD = 0xFC00; //writing into slot 0
+int* MSG_TO  = 0xFC02;
+int* MSG_BODY = 0xFC04;
+int* MSG_LEN = 0xFC06;
+
+
 void enable_interrupts() {
     asm("EI");
 }
@@ -29,4 +37,28 @@ void memcpy(int* dest, int* src, int count) {
     asm("COPY R0, R1, R3"); 
     // We didn't touch R2 (the Frame Pointer), so the 
     // function will return safely!
+}
+
+// Scans the 16 expansion slots (0xFC00 - 0xFCFF).
+// Returns the base address of the peripheral if found, or 0 if not found.
+int* find_peripheral(byte* target_name) {
+    for (int slot = 0; slot < 16; slot++) {
+        int* base_addr = (int*)(0xFC00 + (slot * 16));
+        byte* name_ptr = (byte*)(0xFC00 + (slot * 16) + 8);
+        
+        if (strcmp(name_ptr, target_name) == 0) {
+            return base_addr;
+        }
+    }
+    return 0;
+}
+
+
+void send_msg(int slot, byte* to, byte* body, int len) {
+    int* SLOT_BASE = 0xFC00 + (slot * 16);
+
+    *MSG_TO = to;
+    *MSG_BODY = body;
+    *MSG_LEN = len;
+    *MSG_CMD = 1;
 }

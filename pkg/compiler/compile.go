@@ -3,7 +3,6 @@ package compiler
 import (
 	"fmt"
 	"gocpu/pkg/asm"
-	"log"
 
 	"os"
 )
@@ -43,7 +42,7 @@ func Compile(src string, baseDir string) (*string, []byte, error) {
 
 	machineCode, _, err := asm.Assemble(assembly)
 	if err != nil {
-		log.Fatalf("Assembly failed: %v", err)
+		return &assembly, nil, fmt.Errorf("assembly error: %v", err)
 	}
 
 	return &assembly, machineCode, nil

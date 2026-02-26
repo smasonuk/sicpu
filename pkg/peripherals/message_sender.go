@@ -22,6 +22,9 @@ func NewMessagePeripheral(c *cpu.CPU, slot uint8) *MessagePeripheral {
 }
 
 func (m *MessagePeripheral) Read16(offset uint16) uint16 {
+	if offset >= 0x08 && offset <= 0x0E {
+		return cpu.EncodePeripheralName("MSGSNDR", offset)
+	}
 	switch offset {
 	case 0x00:
 		return 0

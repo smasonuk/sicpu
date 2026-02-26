@@ -51,7 +51,9 @@ func main() {
 
 	asm, mc, err := compiler.Compile(demoSource, baseDir)
 	if err != nil {
+		log.Print(*asm)
 		log.Fatalf("Compilation failed: %v", err)
+		return
 	}
 	machineCode := mc
 

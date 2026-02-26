@@ -50,6 +50,16 @@ func (cg *CodeGen) newStringLabel() string {
 }
 
 func (cg *CodeGen) line(format string, args ...any) {
+	if strings.Contains(format, ":") {
+		// and args[0] is "print"
+		if len(args) > 0 {
+			if s, ok := args[0].(string); ok && s == "print" {
+				fmt.Printf(format+"\n", args...)
+			}
+		}
+
+	}
+
 	fmt.Fprintf(&cg.out, format+"\n", args...)
 }
 

@@ -14,10 +14,10 @@ func Preprocess(src string, baseDir string) (string, error) {
 	// We use a map to track the current include stack to prevent cycles.
 	// We use a map to track definitions.
 	defines := make(map[string]string)
-	return preprocessRecursive(src, baseDir, make(map[string]bool), defines)
+	return preprocessRecursive(src, baseDir, make(map[string]bool), make(map[string]bool), defines)
 }
 
-func preprocessRecursive(src string, baseDir string, visitedStack map[string]bool, defines map[string]string) (string, error) {
+func preprocessRecursive(src string, baseDir string, visitedStack map[string]bool, alreadyProcessed map[string]bool, defines map[string]string) (string, error) {
 	lines := strings.Split(src, "\n")
 	var result strings.Builder
 
@@ -81,6 +81,13 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 				return "", fmt.Errorf("circular include detected: %s", filename)
 			}
 
+			// Check if this file has already been processed in a different branch of the include tree
+			// If so, we can skip reprocessing it to save time, since the result should be the same.
+			if alreadyProcessed[absPath] {
+				continue
+			}
+			alreadyProcessed[absPath] = true
+
 			// Read file
 			content, err := os.ReadFile(fullPath)
 			if err != nil {
@@ -98,7 +105,11 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 			// The baseDir for the included file is its own directory
 			// We pass the same 'defines' map to accumulate definitions across files.
 			includeDir := filepath.Dir(fullPath)
-			processedContent, err := preprocessRecursive(string(content), includeDir, newStack, defines)
+			processedContent, err := preprocessRecursive(string(content),
+				includeDir,
+				newStack,
+				alreadyProcessed,
+				defines)
 			if err != nil {
 				return "", err
 			}

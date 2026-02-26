@@ -20,6 +20,9 @@ func NewDMATester(c *cpu.CPU, slot uint8) *DMATester {
 }
 
 func (d *DMATester) Read16(offset uint16) uint16 {
+	if offset >= 0x08 && offset <= 0x0E {
+		return cpu.EncodePeripheralName("DMATEST", offset)
+	}
 	switch offset {
 	case 0x00: // Command/Status
 		return 0 // Always return 0 for status for now
