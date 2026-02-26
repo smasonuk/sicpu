@@ -2,10 +2,10 @@ package peripherals
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"gocpu/pkg/cpu"
 	"gocpu/pkg/vfs"
-	"errors"
 	"sync"
 )
 
@@ -22,6 +22,8 @@ func NewMessageReceiver(c *cpu.CPU, slot uint8) *MessageReceiver {
 		slot: slot,
 	}
 }
+
+func (cam *MessageReceiver) Type() string { return "MessageReceiver" }
 
 func (m *MessageReceiver) Read16(offset uint16) uint16 {
 	m.mu.Lock()
