@@ -63,14 +63,14 @@ func main() {
 
 	// Register peripheral factories for hibernation restore.
 	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewMessagePeripheral(c, slot)
+		return peripherals.NewMessageSender(c, slot)
 	})
-	cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewDMATester(c, slot)
-	})
+	// cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+	// 	return peripherals.NewDMATester(c, slot)
+	// })
 
 	vm := cpu.NewCPU("gocpu_vfs")
-	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
+	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0))
 
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")

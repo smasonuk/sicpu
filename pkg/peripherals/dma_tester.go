@@ -4,6 +4,8 @@ import (
 	"gocpu/pkg/cpu"
 )
 
+const DMATesterType = "DMATester"
+
 type DMATester struct {
 	c    *cpu.CPU
 	slot uint8
@@ -61,7 +63,7 @@ func (d *DMATester) performDMA() {
 	d.c.TriggerPeripheralInterrupt(d.slot)
 }
 
-func (d *DMATester) Type() string { return "DMATester" }
+func (d *DMATester) Type() string { return DMATesterType }
 
 func (d *DMATester) Step() {
 	// No background task for this tester

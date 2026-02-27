@@ -172,29 +172,6 @@ func main() {
 	ebiten.SetWindowSize(512, 512)
 	ebiten.SetWindowTitle("GoCPU Desktop")
 
-	// // 1. Compile C source
-	// tokens, err := compiler.Lex(demoSource)
-	// if err != nil {
-	// 	log.Fatalf("Lexing failed: %v", err)
-	// }
-
-	// ast, err := compiler.Parse(tokens)
-	// if err != nil {
-	// 	log.Fatalf("Parsing failed: %v", err)
-	// }
-
-	// syms := compiler.NewSymbolTable()
-	// assembly, err := compiler.Generate(ast, syms)
-	// if err != nil {
-	// 	log.Fatalf("Code generation failed: %v", err)
-	// }
-	// fmt.Println(assembly)
-
-	// // 2. Assemble
-	// machineCode, _, err := asm.Assemble(assembly)
-	// if err != nil {
-	// 	log.Fatalf("Assembly failed: %v", err)
-	// }
 	asm, mc, err := compiler.Compile(demoSource, baseDir) // TODO: handle errors
 	if err != nil {
 		log.Fatalf("Compilation failed: %v", err)
@@ -205,16 +182,16 @@ func main() {
 	}
 
 	// Register peripheral factories for hibernation restore.
-	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewMessagePeripheral(c, slot)
+	cpu.RegisterPeripheral(peripherals.MessagePeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewMessageSender(c, slot)
 	})
-	cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewDMATester(c, slot)
+	cpu.RegisterPeripheral(peripherals.CameraPeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewCameraPeripheral(c, slot)
 	})
 
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)
-	vm.MountPeripheral(0, peripherals.NewMessagePeripheral(vm, 0))
+	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0))
 	vm.MountPeripheral(1, peripherals.NewCameraPeripheral(vm, 1))
 
 	if len(machineCode) > len(vm.Memory) {

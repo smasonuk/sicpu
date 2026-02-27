@@ -6,7 +6,9 @@ import (
 	"gocpu/pkg/cpu"
 )
 
-type MessagePeripheral struct {
+const MessagePeripheralType = "MessagePeripheral"
+
+type MessageSender struct {
 	c        *cpu.CPU
 	slot     uint8
 	toAddr   uint16
@@ -14,16 +16,16 @@ type MessagePeripheral struct {
 	bodyLen  uint16
 }
 
-func NewMessagePeripheral(c *cpu.CPU, slot uint8) *MessagePeripheral {
-	return &MessagePeripheral{
+func NewMessageSender(c *cpu.CPU, slot uint8) *MessageSender {
+	return &MessageSender{
 		c:    c,
 		slot: slot,
 	}
 }
 
-func (m *MessagePeripheral) Type() string { return "MessagePeripheral" }
+func (m *MessageSender) Type() string { return MessagePeripheralType }
 
-func (m *MessagePeripheral) Read16(offset uint16) uint16 {
+func (m *MessageSender) Read16(offset uint16) uint16 {
 	if offset >= 0x08 && offset <= 0x0E {
 		return cpu.EncodePeripheralName("MSGSNDR", offset)
 	}
@@ -40,7 +42,7 @@ func (m *MessagePeripheral) Read16(offset uint16) uint16 {
 	return 0
 }
 
-func (m *MessagePeripheral) Write16(offset uint16, val uint16) {
+func (m *MessageSender) Write16(offset uint16, val uint16) {
 	switch offset {
 	case 0x00:
 		if val == 1 {
@@ -55,12 +57,12 @@ func (m *MessagePeripheral) Write16(offset uint16, val uint16) {
 	}
 }
 
-func (m *MessagePeripheral) Step() {
+func (m *MessageSender) Step() {
 	// Synchronous peripheral, no step needed
 }
 
 // SaveState serialises toAddr, bodyAddr, and bodyLen as 6 little-endian bytes.
-func (m *MessagePeripheral) SaveState() []byte {
+func (m *MessageSender) SaveState() []byte {
 	buf := make([]byte, 6)
 	binary.LittleEndian.PutUint16(buf[0:], m.toAddr)
 	binary.LittleEndian.PutUint16(buf[2:], m.bodyAddr)
@@ -69,7 +71,7 @@ func (m *MessagePeripheral) SaveState() []byte {
 }
 
 // LoadState restores toAddr, bodyAddr, and bodyLen from the 6-byte payload.
-func (m *MessagePeripheral) LoadState(data []byte) error {
+func (m *MessageSender) LoadState(data []byte) error {
 	if len(data) < 6 {
 		return fmt.Errorf("MessagePeripheral.LoadState: need 6 bytes, got %d", len(data))
 	}
@@ -79,7 +81,7 @@ func (m *MessagePeripheral) LoadState(data []byte) error {
 	return nil
 }
 
-func (m *MessagePeripheral) sendMessage() {
+func (m *MessageSender) sendMessage() {
 	target, err := m.c.ReadStringFromRAM(m.toAddr)
 	if err != nil {
 		fmt.Printf("[Message HW] Error reading target: %v\n", err)

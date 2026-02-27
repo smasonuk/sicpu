@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+const MessageReceiverType = "MessageReceiver"
+
 type MessageReceiver struct {
 	c     *cpu.CPU
 	slot  uint8
@@ -23,7 +25,7 @@ func NewMessageReceiver(c *cpu.CPU, slot uint8) *MessageReceiver {
 	}
 }
 
-func (cam *MessageReceiver) Type() string { return "MessageReceiver" }
+func (cam *MessageReceiver) Type() string { return MessageReceiverType }
 
 func (m *MessageReceiver) Read16(offset uint16) uint16 {
 	m.mu.Lock()

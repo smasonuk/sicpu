@@ -27,7 +27,7 @@ func TestSendMessageIntegration(t *testing.T) {
 
 	// 3. Setup CPU and Peripheral
 	vm := cpu.NewCPU()
-	p := peripherals.NewMessagePeripheral(vm, 0)
+	p := peripherals.NewMessageSender(vm, 0)
 	vm.MountPeripheral(0, p)
 
 	// 4. Load Code

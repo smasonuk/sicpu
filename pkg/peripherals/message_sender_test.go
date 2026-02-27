@@ -12,7 +12,7 @@ import (
 func TestMessagePeripheral(t *testing.T) {
 	// Setup
 	c := cpu.NewCPU()
-	p := NewMessagePeripheral(c, 0)
+	p := NewMessageSender(c, 0)
 	c.MountPeripheral(0, p)
 
 	// Action
