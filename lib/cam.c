@@ -20,7 +20,7 @@
 
 // TODO: find the peripheral
 
-void take_picture_and_send(byte* send_to_address) {
+void take_picture_and_send(char* send_to_address) {
     // 1. Configure the camera buffer, dimensions, then trigger capture.
     int* cam_buf = (int*)CAMERA_BUF;
     *cam_buf = IMAGE_BUFFER;

@@ -7,17 +7,23 @@ import (
 	"strings"
 )
 
+// Macro represents a defined macro, either simple or function-like.
+type Macro struct {
+	Args []string // Empty for simple macros
+	Body string
+}
+
 // Preprocess scans the source code for `#include "filename"` and `#define NAME VALUE` directives.
 // It replaces includes with file content and substitutes defines.
 // It handles nested includes and prevents circular dependencies (include loops).
 func Preprocess(src string, baseDir string) (string, error) {
 	// We use a map to track the current include stack to prevent cycles.
 	// We use a map to track definitions.
-	defines := make(map[string]string)
+	defines := make(map[string]Macro)
 	return preprocessRecursive(src, baseDir, make(map[string]bool), make(map[string]bool), defines)
 }
 
-func preprocessRecursive(src string, baseDir string, visitedStack map[string]bool, alreadyProcessed map[string]bool, defines map[string]string) (string, error) {
+func preprocessRecursive(src string, baseDir string, visitedStack map[string]bool, alreadyProcessed map[string]bool, defines map[string]Macro) (string, error) {
 	lines := strings.Split(src, "\n")
 	var result strings.Builder
 
@@ -26,20 +32,58 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 
 		// Handle #define
 		if strings.HasPrefix(trimmed, "#define") {
-			// Expected format: #define NAME VALUE
-			parts := strings.Fields(trimmed)
-			if len(parts) >= 3 {
-				name := parts[1]
-				value := strings.Join(parts[2:], " ")
-
-				// Perform substitution on the value itself using existing defines
-				// This handles nested definitions like:
-				// #define A 10
-				// #define B (A + 5) -> (10 + 5)
-				value = applyDefines(value, defines)
-
-				defines[name] = value
+			// Expected format: #define NAME VALUE or #define NAME(ARGS) VALUE
+			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "#define"))
+			if rest == "" {
+				continue
 			}
+
+			// Parse name. Name ends at space or (.
+			nameEnd := 0
+			for nameEnd < len(rest) {
+				r := rest[nameEnd]
+				if r == ' ' || r == '\t' || r == '(' {
+					break
+				}
+				nameEnd++
+			}
+			name := rest[:nameEnd]
+			rest = rest[nameEnd:]
+
+			var args []string
+			// Check for function-like macro: #define FOO(a,b) ...
+			// Must have '(' immediately after name (no spaces).
+			if len(rest) > 0 && rest[0] == '(' {
+				// Parse args
+				closeParen := strings.Index(rest, ")")
+				if closeParen == -1 {
+					return "", fmt.Errorf("unterminated macro parameter list")
+				}
+				argStr := rest[1:closeParen]
+				if strings.TrimSpace(argStr) != "" {
+					argParts := strings.Split(argStr, ",")
+					for _, arg := range argParts {
+						args = append(args, strings.TrimSpace(arg))
+					}
+				}
+				rest = rest[closeParen+1:]
+			}
+
+			value := strings.TrimSpace(rest)
+
+			// Perform substitution on the value itself using existing defines (for simple macros)
+			// For function-like macros, we do this at expansion time.
+			// Actually, C preprocessor expands body?
+			// Let's keep it simple: Expand simple macros in body immediately.
+			// But for function-like, arguments shadow global defines.
+			// So applyDefines needs to be careful.
+			// For now, we won't pre-expand body of function-like macros to avoid complexity with args.
+			if len(args) == 0 {
+				value = applyDefines(value, defines)
+			}
+
+			defines[name] = Macro{Args: args, Body: value}
+
 			// Replace with empty line to preserve line count roughly
 			result.WriteString("\n")
 			continue
@@ -129,7 +173,7 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 
 // applyDefines replaces occurrences of keys in defines map with their values in the input string.
 // It ensures that replacements only happen on word boundaries and not inside string/char literals.
-func applyDefines(input string, defines map[string]string) string {
+func applyDefines(input string, defines map[string]Macro) string {
 	if len(defines) == 0 {
 		return input
 	}
@@ -182,8 +226,72 @@ func applyDefines(input string, defines map[string]string) string {
 					i++
 				}
 				word := input[start:i]
-				if val, ok := defines[word]; ok {
-					sb.WriteString(val)
+				if macro, ok := defines[word]; ok {
+					// Found a macro. Check if it's function-like.
+					if len(macro.Args) > 0 {
+						// Function-like macro expansion
+						// Look ahead for '('
+						// Skip whitespace
+						j := i
+						for j < n && (input[j] == ' ' || input[j] == '\t') {
+							j++
+						}
+						if j < n && input[j] == '(' {
+							// Parse arguments
+							j++ // consume '('
+							var args []string
+							var currentArg strings.Builder
+							parenDepth := 1
+							for j < n && parenDepth > 0 {
+								if input[j] == '(' {
+									parenDepth++
+									currentArg.WriteByte(input[j])
+								} else if input[j] == ')' {
+									parenDepth--
+									if parenDepth > 0 {
+										currentArg.WriteByte(input[j])
+									}
+								} else if input[j] == ',' && parenDepth == 1 {
+									args = append(args, strings.TrimSpace(currentArg.String()))
+									currentArg.Reset()
+								} else {
+									currentArg.WriteByte(input[j])
+								}
+								j++
+							}
+							if parenDepth == 0 {
+								args = append(args, strings.TrimSpace(currentArg.String()))
+
+								// Expand body
+								if len(args) == len(macro.Args) {
+									// Build a single substitution map for all arguments and apply it in one
+									// pass. A single pass prevents earlier substitutions from being
+									// accidentally re-substituted by later argument names (argument bleeding).
+									body := macro.Body
+									argMap := make(map[string]Macro, len(macro.Args))
+									for k, argName := range macro.Args {
+										argMap[argName] = Macro{Body: args[k]}
+									}
+									body = applyDefines(body, argMap)
+
+									// Then recursively apply globals to the result.
+									// Note: This naive recursion might loop if a macro expands to itself
+									// (e.g. #define A A). Standard C prevents this by marking the macro as
+									// 'disabled' during expansion; we omit that check for simplicity.
+									expanded := applyDefines(body, defines)
+									sb.WriteString(expanded)
+
+									i = j
+									continue
+								}
+							}
+						}
+						// If not followed by '(', treat as normal identifier (don't expand)
+						sb.WriteString(word)
+					} else {
+						// Simple macro
+						sb.WriteString(macro.Body)
+					}
 				} else {
 					sb.WriteString(word)
 				}

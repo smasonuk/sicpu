@@ -41,10 +41,10 @@ void memcpy(int* dest, int* src, int count) {
 
 // Scans the 16 expansion slots (0xFC00 - 0xFCFF).
 // Returns the base address of the peripheral if found, or 0 if not found.
-int* find_peripheral(byte* target_name) {
+int* find_peripheral(char* target_name) {
     for (int slot = 0; slot < 16; slot++) {
         int* base_addr = (int*)(0xFC00 + (slot * 16));
-        byte* name_ptr = (byte*)(0xFC00 + (slot * 16) + 8);
+        char* name_ptr = (char*)(0xFC00 + (slot * 16) + 8);
         
         if (strcmp(name_ptr, target_name) == 0) {
             return base_addr;
@@ -54,7 +54,7 @@ int* find_peripheral(byte* target_name) {
 }
 
 
-void send_msg(int slot, byte* to, byte* body, int len) {
+void send_msg(int slot, char* to, char* body, int len) {
     int* SLOT_BASE = 0xFC00 + (slot * 16);
 
     *MSG_TO = to;

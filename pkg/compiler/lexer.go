@@ -8,7 +8,7 @@ import (
 // keywords maps source text to its keyword TokenType.
 var keywords = map[string]TokenType{
 	"int":      INT,
-	"byte":     BYTE,
+	"char":     CHAR,
 	"unsigned": UNSIGNED,
 	"void":     VOID,
 	"if":       IF,
@@ -23,6 +23,10 @@ var keywords = map[string]TokenType{
 	"default":  DEFAULT,
 	"break":    BREAK,
 	"continue": CONTINUE,
+	"volatile": VOLATILE,
+	"const":    CONST,
+	"static":   STATIC,
+	"extern":   EXTERN,
 }
 
 // Lexer holds all mutable state for a single scanning pass over src.

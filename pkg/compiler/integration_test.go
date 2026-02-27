@@ -12,8 +12,8 @@ func TestIntegration_DynamicGlobals(t *testing.T) {
 	src := `
 	int a = 10;
 	int b;
-	byte c = 5;
-	byte d;
+	char c = 5;
+	char d;
 	int arr[2] = {1, 2};
 
 	int main() {

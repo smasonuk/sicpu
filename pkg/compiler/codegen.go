@@ -70,22 +70,19 @@ func (cg *CodeGen) comment(format string, args ...any) {
 // calcSize determines the size in bytes of a variable declaration.
 func (cg *CodeGen) calcSize(decl VariableDecl) (int, error) {
 	elemSize := 2 // Default to int/pointer size (2 bytes)
-	if decl.IsByte {
-		elemSize = 1
-	} else if decl.IsStruct {
-		// If it's a pointer to a struct, size is 2 (handled by IsPointer check below? No, IsStruct is false for pointer).
-		// Wait, parser sets IsStruct=true only if NOT pointer.
-		// So here decl.IsStruct implies value type.
-		def, ok := cg.syms.GetStruct(decl.StructName)
-		if !ok {
-			return 0, fmt.Errorf("unknown struct %q", decl.StructName)
-		}
-		elemSize = def.Size
-	}
 
-	// Pointers are always 2 bytes
-	if decl.IsPointer {
-		elemSize = 2
+	// Pointers (including pointers to incomplete/opaque structs) are always word-sized.
+	// Check this first so we never attempt a struct lookup for a pointer type.
+	if decl.PointerLevel == 0 {
+		if decl.IsChar {
+			elemSize = 1
+		} else if decl.IsStruct {
+			def, ok := cg.syms.GetStruct(decl.StructName)
+			if !ok {
+				return 0, fmt.Errorf("unknown struct %q", decl.StructName)
+			}
+			elemSize = def.Size
+		}
 	}
 
 	if decl.IsArray {
@@ -125,34 +122,35 @@ func (cg *CodeGen) getType(e Expr) (TypeInfo, error) {
 			if len(remainingDims) == 0 {
 				// Fully indexed -> Element type
 				return TypeInfo{
-					IsArray:    false,
-					IsStruct:   leftType.IsStruct,
-					StructName: leftType.StructName,
-					IsByte:     leftType.IsByte,
-					IsPointer:  leftType.IsPointer,
-					IsUnsigned: leftType.IsUnsigned,
+					IsArray:      false,
+					IsStruct:     leftType.IsStruct,
+					StructName:   leftType.StructName,
+					IsChar:       leftType.IsChar,
+					PointerLevel: leftType.PointerLevel,
+					IsUnsigned:   leftType.IsUnsigned,
 				}, nil
 			} else {
 				// Partially indexed -> Sub-array (which decays to pointer to first element of subarray in C, but here we treat as array type)
 				return TypeInfo{
-					IsArray:    true,
-					ArraySizes: remainingDims,
-					IsStruct:   leftType.IsStruct,
-					StructName: leftType.StructName,
-					IsByte:     leftType.IsByte,
-					IsPointer:  leftType.IsPointer,
-					IsUnsigned: leftType.IsUnsigned,
+					IsArray:      true,
+					ArraySizes:   remainingDims,
+					IsStruct:     leftType.IsStruct,
+					StructName:   leftType.StructName,
+					IsChar:       leftType.IsChar,
+					PointerLevel: leftType.PointerLevel,
+					IsUnsigned:   leftType.IsUnsigned,
 				}, nil
 			}
 		}
 		// Pointer indexing: int *p; p[i].
 		// Treated as scalar access.
 		// If Left is a pointer to byte, result is byte.
-		if leftType.IsPointer {
+		if leftType.PointerLevel > 0 {
 			if len(n.Indices) > 1 {
 				return TypeInfo{}, fmt.Errorf("multi-dimensional indexing not supported for pointers")
 			}
-			return TypeInfo{IsByte: leftType.IsByte, IsUnsigned: leftType.IsUnsigned}, nil
+			// Dereferencing decreases pointer level
+			return TypeInfo{IsChar: leftType.IsChar, PointerLevel: leftType.PointerLevel - 1, IsUnsigned: leftType.IsUnsigned}, nil
 		}
 		return TypeInfo{}, nil
 
@@ -182,9 +180,13 @@ func (cg *CodeGen) getType(e Expr) (TypeInfo, error) {
 			if err != nil {
 				return TypeInfo{}, err
 			}
-			// If rightType is pointer to byte, result is byte.
-			if rightType.IsPointer {
-				return TypeInfo{IsByte: rightType.IsByte, IsUnsigned: rightType.IsUnsigned}, nil
+			// If rightType is pointer, decrement level.
+			if rightType.PointerLevel > 0 {
+				return TypeInfo{
+					IsChar:       rightType.IsChar,
+					PointerLevel: rightType.PointerLevel - 1,
+					IsUnsigned:   rightType.IsUnsigned,
+				}, nil
 			}
 			return TypeInfo{}, nil
 		}
@@ -243,7 +245,7 @@ func (cg *CodeGen) genAddress(e Expr) error {
 
 		if leftType.IsArray {
 			baseElemSize := 2
-			if leftType.IsByte {
+			if leftType.IsChar {
 				baseElemSize = 1
 			} else if leftType.IsStruct {
 				def, ok := cg.syms.GetStruct(leftType.StructName)
@@ -280,13 +282,15 @@ func (cg *CodeGen) genAddress(e Expr) error {
 				cg.line("    ADD R1, R0")
 				cg.line("    PUSH R1") // Save new offset
 			}
-		} else if leftType.IsPointer {
+		} else if leftType.PointerLevel > 0 {
 			// Pointer arithmetic: only 1 index supported
 			if len(n.Indices) != 1 {
 				return fmt.Errorf("pointers only support single index")
 			}
 			elemSize := 2
-			if leftType.IsByte {
+			// If pointer to char (level 1), element size is 1.
+			// If pointer to pointer (level > 1), element size is 2 (pointer size).
+			if leftType.IsChar && leftType.PointerLevel == 1 {
 				elemSize = 1
 			}
 
@@ -378,7 +382,7 @@ func (cg *CodeGen) genExpr(e Expr) error {
 		if err := cg.genAddress(e); err != nil {
 			return err
 		}
-		if sym.Type.IsByte && !sym.Type.IsPointer {
+		if sym.Type.IsChar && sym.Type.PointerLevel == 0 {
 			cg.line("    LDB R0, [R1]")
 		} else {
 			cg.line("    LD  R0, [R1]")
@@ -403,7 +407,7 @@ func (cg *CodeGen) genExpr(e Expr) error {
 		if err := cg.genAddress(e); err != nil {
 			return err
 		}
-		if typ.IsByte && !typ.IsPointer {
+		if typ.IsChar && typ.PointerLevel == 0 {
 			cg.line("    LDB R0, [R1]")
 		} else {
 			cg.line("    LD  R0, [R1]")
@@ -727,7 +731,7 @@ func (cg *CodeGen) genExpr(e Expr) error {
 			}
 			// R0 has address.
 			cg.line("    MOV R1, R0")
-			if typ.IsByte && !typ.IsPointer {
+			if typ.IsChar && typ.PointerLevel == 0 {
 				cg.line("    LDB R0, [R1]")
 			} else {
 				cg.line("    LD  R0, [R1]")
@@ -773,12 +777,12 @@ func (cg *CodeGen) genExpr(e Expr) error {
 		if err := cg.genExpr(n.Expr); err != nil {
 			return err
 		}
-		if n.Type == BYTE && !n.IsPointer {
+		if n.Type == CHAR && n.PointerLevel == 0 {
 			// Truncate to 8 bits
 			cg.line("    LDI R1, 0x00FF")
 			cg.line("    AND R0, R1")
 		}
-		// INT cast is no-op on 16-bit machine
+		// INT/Pointer/Struct pointer casts are no-ops on 16-bit machine (bit representation doesn't change)
 		return nil
 
 	case *Literal:
@@ -941,13 +945,13 @@ func (cg *CodeGen) countLocals(stmt Stmt) (int, error) {
 			}
 
 			typeInfo := TypeInfo{
-				IsArray:    field.IsArray,
-				ArraySizes: field.ArraySizes,
-				IsStruct:   field.IsStruct,
-				StructName: field.StructName,
-				IsByte:     field.IsByte,
-				IsPointer:  field.IsPointer,
-				IsUnsigned: field.IsUnsigned,
+				IsArray:      field.IsArray,
+				ArraySizes:   field.ArraySizes,
+				IsStruct:     field.IsStruct,
+				StructName:   field.StructName,
+				IsChar:       field.IsChar,
+				PointerLevel: field.PointerLevel,
+				IsUnsigned:   field.IsUnsigned,
 			}
 
 			def.Fields[field.Name] = FieldInfo{Offset: byteOffset, Type: typeInfo}
@@ -992,13 +996,13 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 
 			// field.Type info
 			typeInfo := TypeInfo{
-				IsArray:    field.IsArray,
-				ArraySizes: field.ArraySizes,
-				IsStruct:   field.IsStruct,
-				StructName: field.StructName,
-				IsByte:     field.IsByte,
-				IsPointer:  field.IsPointer,
-				IsUnsigned: field.IsUnsigned,
+				IsArray:      field.IsArray,
+				ArraySizes:   field.ArraySizes,
+				IsStruct:     field.IsStruct,
+				StructName:   field.StructName,
+				IsChar:       field.IsChar,
+				PointerLevel: field.PointerLevel,
+				IsUnsigned:   field.IsUnsigned,
 			}
 
 			def.Fields[field.Name] = FieldInfo{Offset: byteOffset, Type: typeInfo}
@@ -1015,13 +1019,13 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 		}
 
 		typeInfo := TypeInfo{
-			IsArray:    n.IsArray,
-			ArraySizes: n.ArraySizes,
-			IsStruct:   n.IsStruct,
-			StructName: n.StructName,
-			IsByte:     n.IsByte,
-			IsPointer:  n.IsPointer,
-			IsUnsigned: n.IsUnsigned,
+			IsArray:      n.IsArray,
+			ArraySizes:   n.ArraySizes,
+			IsStruct:     n.IsStruct,
+			StructName:   n.StructName,
+			IsChar:       n.IsChar,
+			PointerLevel: n.PointerLevel,
+			IsUnsigned:   n.IsUnsigned,
 		}
 
 		sym, exists := cg.syms.Allocate(n.Name, typeInfo, size)
@@ -1083,7 +1087,7 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 			}
 
 			storeOp := "ST "
-			if n.IsByte && !n.IsPointer && !n.IsArray {
+			if n.IsChar && n.PointerLevel == 0 && !n.IsArray {
 				storeOp = "STB"
 			}
 
@@ -1118,7 +1122,7 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 
 		// If compound assignment, we need to load the current value first.
 		if n.Op != ASSIGN {
-			if lhsType.IsByte && !lhsType.IsPointer && !lhsType.IsArray && !lhsType.IsStruct {
+			if lhsType.IsChar && lhsType.PointerLevel == 0 && !lhsType.IsArray && !lhsType.IsStruct {
 				cg.line("    LDB R0, [R1]")
 			} else {
 				cg.line("    LD  R0, [R1]")
@@ -1155,7 +1159,7 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 
 		cg.line("    POP R1") // Restore address
 		storeOp := "ST "
-		if lhsType.IsByte && !lhsType.IsPointer && !lhsType.IsArray && !lhsType.IsStruct {
+		if lhsType.IsChar && lhsType.PointerLevel == 0 && !lhsType.IsArray && !lhsType.IsStruct {
 			storeOp = "STB"
 		}
 		cg.line("    %s [R1], R0", storeOp)
@@ -1408,7 +1412,7 @@ func (cg *CodeGen) genStmt(s Stmt) error {
 			cg.line("    ADD R1, R3")
 
 			storeOp := "ST "
-			if param.IsByte && !param.IsPointer && !param.IsArray {
+			if param.IsChar && param.PointerLevel == 0 && !param.IsArray {
 				storeOp = "STB"
 			}
 			cg.line("    %s [R1], %s", storeOp, argRegs[i])
@@ -1456,13 +1460,13 @@ func Generate(stmts []Stmt, syms *SymbolTable) (string, error) {
 		if decl, ok := s.(*VariableDecl); ok {
 			size, _ := cg.calcSize(*decl)
 			typeInfo := TypeInfo{
-				IsArray:    decl.IsArray,
-				ArraySizes: decl.ArraySizes,
-				IsStruct:   decl.IsStruct,
-				StructName: decl.StructName,
-				IsByte:     decl.IsByte,
-				IsPointer:  decl.IsPointer,
-				IsUnsigned: decl.IsUnsigned,
+				IsArray:      decl.IsArray,
+				ArraySizes:   decl.ArraySizes,
+				IsStruct:     decl.IsStruct,
+				StructName:   decl.StructName,
+				IsChar:       decl.IsChar,
+				PointerLevel: decl.PointerLevel,
+				IsUnsigned:   decl.IsUnsigned,
 			}
 			cg.syms.Allocate(decl.Name, typeInfo, size)
 		}
@@ -1514,7 +1518,7 @@ func Generate(stmts []Stmt, syms *SymbolTable) (string, error) {
 				cg.line("    LDI R1, %s", sym.Label)
 
 				storeOp := "ST "
-				if decl.IsByte && !decl.IsPointer && !decl.IsArray {
+				if decl.IsChar && decl.PointerLevel == 0 && !decl.IsArray {
 					storeOp = "STB"
 				}
 

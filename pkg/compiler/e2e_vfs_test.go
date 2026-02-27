@@ -62,7 +62,7 @@ func TestVFS_WriteRead(t *testing.T) {
 
 	int main() {
 		// Write "Hello" to test.txt
-		byte buf[6];
+		char buf[6];
 		buf[0] = 72; // H
 		buf[1] = 101; // e
 		buf[2] = 108; // l
@@ -74,7 +74,7 @@ func TestVFS_WriteRead(t *testing.T) {
 		if (err != 0) return err;
 
 		// Read back
-		byte readBuf[10];
+		char readBuf[10];
 		err = vfs_read("test.txt", readBuf);
 		if (err != 0) return err;
 

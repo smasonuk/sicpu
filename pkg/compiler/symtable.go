@@ -14,13 +14,13 @@ const (
 )
 
 type TypeInfo struct {
-	IsArray    bool
-	ArraySizes []int
-	IsStruct   bool
-	StructName string
-	IsByte     bool
-	IsPointer  bool
-	IsUnsigned bool
+	IsArray      bool
+	ArraySizes   []int
+	IsStruct     bool
+	StructName   string
+	IsChar       bool
+	PointerLevel int // 0 for scalar, 1 for *, 2 for **, etc.
+	IsUnsigned   bool
 }
 
 type FieldInfo struct {
@@ -95,18 +95,18 @@ func (s *SymbolTable) DefineParam(decl VariableDecl, paramIndex int) {
 		panic("DefineParam called outside function scope")
 	}
 	typeInfo := TypeInfo{
-		IsArray:    decl.IsArray,
-		ArraySizes: decl.ArraySizes,
-		IsStruct:   decl.IsStruct,
-		StructName: decl.StructName,
-		IsByte:     decl.IsByte,
-		IsPointer:  decl.IsPointer,
-		IsUnsigned: decl.IsUnsigned,
+		IsArray:      decl.IsArray,
+		ArraySizes:   decl.ArraySizes,
+		IsStruct:     decl.IsStruct,
+		StructName:   decl.StructName,
+		IsChar:       decl.IsChar,
+		PointerLevel: decl.PointerLevel,
+		IsUnsigned:   decl.IsUnsigned,
 	}
 
 	// Calculate size
 	size := 2
-	if decl.IsByte {
+	if decl.IsChar {
 		size = 1
 	} else if decl.IsStruct {
 		if def, ok := s.GetStruct(decl.StructName); ok {
@@ -114,7 +114,7 @@ func (s *SymbolTable) DefineParam(decl VariableDecl, paramIndex int) {
 		}
 	}
 
-	if decl.IsPointer {
+	if decl.PointerLevel > 0 {
 		size = 2
 	}
 

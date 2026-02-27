@@ -76,6 +76,38 @@ func (p *Parser) peekAt(offset int) Token {
 	return p.tokens[p.pos+offset]
 }
 
+// isQualifier returns true for type-qualifier tokens that should be silently consumed.
+func isQualifier(tt TokenType) bool {
+	return tt == VOLATILE || tt == CONST || tt == STATIC || tt == EXTERN
+}
+
+// skipQualifiers consumes any leading qualifier tokens.
+func (p *Parser) skipQualifiers() {
+	for isQualifier(p.peek().Type) {
+		p.advance()
+	}
+}
+
+// qualifierCount returns the number of consecutive qualifier tokens starting at
+// the current lookahead position. Used for peek-ahead without consuming.
+func (p *Parser) qualifierCount() int {
+	count := 0
+	for isQualifier(p.peekAt(count).Type) {
+		count++
+	}
+	return count
+}
+
+// pointerCount returns the number of consecutive STAR tokens starting at startOffset.
+// Used for peek-ahead to handle multi-level pointer return types without consuming.
+func (p *Parser) pointerCount(startOffset int) int {
+	count := 0
+	for p.peekAt(startOffset+count).Type == STAR {
+		count++
+	}
+	return count
+}
+
 // advance consumes and returns the current token.
 func (p *Parser) advance() Token {
 	tok := p.peek()
@@ -287,35 +319,81 @@ func (p *Parser) parseMultiplicative() (Expr, error) {
 	return expr, nil
 }
 
+// parseTypeName parses a type specification like "int", "char **", "struct Foo *".
+// It returns the base type (token), struct name (if applicable), pointer level, and an error.
+func (p *Parser) parseTypeName() (TokenType, string, int, error) {
+	var baseType TokenType
+	var structName string
+	var ptrLevel int
+
+	// Skip any leading qualifiers (volatile, const, static, extern).
+	p.skipQualifiers()
+
+	if p.peek().Type == INT || p.peek().Type == CHAR {
+		baseType = p.advance().Type
+	} else if p.peek().Type == STRUCT {
+		p.advance() // consume struct
+		baseType = STRUCT
+		nameTok, err := p.expect(IDENTIFIER)
+		if err != nil {
+			return 0, "", 0, err
+		}
+		structName = nameTok.Lexeme
+	} else {
+		return 0, "", 0, fmt.Errorf("expected type")
+	}
+
+	for p.peek().Type == STAR {
+		p.advance()
+		ptrLevel++
+	}
+
+	return baseType, structName, ptrLevel, nil
+}
+
 // parseUnary handles prefix operators &, *, ~, !, and - (unary minus)
 func (p *Parser) parseUnary() (Expr, error) {
-	// Handle Casts: (int), (byte), (int*), or (byte*)
+	// Handle Casts: (int), (char), (struct Foo*), etc.
+	// We need to look ahead to see if it's a cast or just a parenthesized expression.
+	// A cast looks like: '(' type_spec ')' unary_expr
 	if p.peek().Type == LPAREN {
-		nextTok := p.peekAt(1).Type
-		if nextTok == INT || nextTok == BYTE {
-			// Check if it's a pointer cast
-			isPtr := p.peekAt(2).Type == STAR
+		// Lookahead to check if it's a type cast. Skip qualifiers before checking.
+		isCast := false
+		idx := 1
+		for isQualifier(p.peekAt(idx).Type) {
+			idx++
+		}
+		if p.peekAt(idx).Type == INT || p.peekAt(idx).Type == CHAR {
+			isCast = true
+		} else if p.peekAt(idx).Type == STRUCT {
+			isCast = true
+		} else if p.peekAt(idx).Type == UNSIGNED {
+			isCast = true
+		}
 
-			// Determine where the closing parenthesis should be
-			rparenOffset := 2
-			if isPtr {
-				rparenOffset = 3
+		if isCast {
+			// We suspect a cast. But standard C is tricky: (x) - 5 vs (int) - 5.
+			// If it starts with a type keyword, it's likely a cast.
+			// Let's try to parse a type. If we fail or don't see a closing RPAREN, backtrack?
+			// Since our parser is single pass with limited lookahead, we rely on the fact that
+			// expressions don't start with INT/CHAR/STRUCT.
+			// So if we see LPAREN then INT/CHAR/STRUCT, it MUST be a cast.
+
+			p.advance() // consume '('
+			baseType, structName, ptrLevel, err := p.parseTypeName()
+			if err != nil {
+				return nil, err
 			}
 
-			if p.peekAt(rparenOffset).Type == RPAREN {
-				p.advance()            // consume '('
-				typeTok := p.advance() // consume 'int' or 'byte'
-				if isPtr {
-					p.advance() // consume '*'
-				}
-				p.advance() // consume ')'
-
-				right, err := p.parseUnary()
-				if err != nil {
-					return nil, err
-				}
-				return &CastExpr{Type: typeTok.Type, IsPointer: isPtr, Expr: right}, nil
+			if _, err := p.expect(RPAREN); err != nil {
+				return nil, err
 			}
+
+			right, err := p.parseUnary()
+			if err != nil {
+				return nil, err
+			}
+			return &CastExpr{Type: baseType, StructName: structName, PointerLevel: ptrLevel, Expr: right}, nil
 		}
 	}
 
@@ -483,6 +561,9 @@ func (p *Parser) parseInitializerList() (*InitializerList, error) {
 func (p *Parser) parseVarDeclInternal(isField bool) (*VariableDecl, error) {
 	var decl VariableDecl
 
+	// Consume any leading qualifiers (volatile, const, static, extern).
+	p.skipQualifiers()
+
 	// Parse type
 	if p.peek().Type == UNSIGNED {
 		p.advance()
@@ -491,24 +572,24 @@ func (p *Parser) parseVarDeclInternal(isField bool) (*VariableDecl, error) {
 			p.advance()
 		}
 		// Optional *
-		if p.peek().Type == STAR {
+		for p.peek().Type == STAR {
 			p.advance()
-			decl.IsPointer = true
+			decl.PointerLevel++
 		}
 	} else if p.peek().Type == INT {
 		p.advance()
 		// Optional *
-		if p.peek().Type == STAR {
+		for p.peek().Type == STAR {
 			p.advance()
-			decl.IsPointer = true
+			decl.PointerLevel++
 		}
-	} else if p.peek().Type == BYTE {
+	} else if p.peek().Type == CHAR {
 		p.advance()
-		decl.IsByte = true
+		decl.IsChar = true
 		// Optional *
-		if p.peek().Type == STAR {
+		for p.peek().Type == STAR {
 			p.advance()
-			decl.IsPointer = true
+			decl.PointerLevel++
 		}
 	} else if p.peek().Type == STRUCT {
 		p.advance()
@@ -520,14 +601,17 @@ func (p *Parser) parseVarDeclInternal(isField bool) (*VariableDecl, error) {
 		decl.StructName = nameTok.Lexeme
 		// Optional *
 		if p.peek().Type == STAR {
-			p.advance()
 			// Pointer to struct. Treat as scalar int (pointer).
+			// If pointer level >= 1, it's a pointer.
 			decl.IsStruct = false
 			decl.StructName = "" // clear it to treat as scalar
-			decl.IsPointer = true
+			for p.peek().Type == STAR {
+				p.advance()
+				decl.PointerLevel++
+			}
 		}
 	} else {
-		return nil, fmt.Errorf("line %d: expected type (int, byte, or struct)", p.peek().Line)
+		return nil, fmt.Errorf("line %d: expected type (int, char, or struct)", p.peek().Line)
 	}
 
 	nameTok, err := p.expect(IDENTIFIER)
@@ -842,7 +926,8 @@ func (p *Parser) parseForStmt() (Stmt, error) {
 
 	var init Stmt
 	if p.peek().Type != SEMICOLON {
-		if p.peek().Type == INT || p.peek().Type == BYTE || p.peek().Type == UNSIGNED {
+		if p.peek().Type == INT || p.peek().Type == CHAR || p.peek().Type == UNSIGNED ||
+			isQualifier(p.peek().Type) {
 			var err error
 			init, err = p.parseVarDecl()
 			if err != nil {
@@ -969,7 +1054,7 @@ func (p *Parser) parseStatement() (Stmt, error) {
 		}
 		return &ContinueStmt{}, nil
 
-	case INT, BYTE, UNSIGNED:
+	case INT, CHAR, UNSIGNED, VOLATILE, CONST, STATIC, EXTERN:
 		return p.parseVarDecl()
 
 	case STRUCT:
@@ -1018,6 +1103,7 @@ func (p *Parser) parseStatement() (Stmt, error) {
 // parseFunctionDecl parses int name(params) { ... } or void name(params) { ... }
 func (p *Parser) parseFunctionDecl() (Stmt, error) {
 	var retType string
+	p.skipQualifiers()
 	if p.peek().Type == UNSIGNED {
 		p.advance()
 		retType = "unsigned"
@@ -1030,24 +1116,24 @@ func (p *Parser) parseFunctionDecl() (Stmt, error) {
 		p.advance()
 		retType = "int"
 		p.currentRetType = INT
-	} else if p.peek().Type == BYTE {
+	} else if p.peek().Type == CHAR {
 		p.advance()
-		retType = "byte"
-		p.currentRetType = BYTE // This assumes we add BYTE to TokenType enum, which we did.
-		// Note: p.currentRetType is TokenType. INT/VOID/BYTE match.
+		retType = "char"
+		p.currentRetType = CHAR // This assumes we add CHAR to TokenType enum, which we did.
+		// Note: p.currentRetType is TokenType. INT/VOID/CHAR match.
 	} else if p.peek().Type == VOID {
 		p.advance()
 		retType = "void"
 		p.currentRetType = VOID
 	} else {
-		return nil, fmt.Errorf("line %d: expected return type (int, byte, or void)", p.peek().Line)
+		return nil, fmt.Errorf("line %d: expected return type (int, char, or void)", p.peek().Line)
 	}
 
 	// Step over optional '*' for the return type
-	if p.peek().Type == STAR {
+	for p.peek().Type == STAR {
 		p.advance()
 		// If pointer, treat as int/pointer (size 2)
-		// Return type string representation might need to be "int*" or "byte*"
+		// Return type string representation might need to be "int*" or "char*"
 		// But codegen likely doesn't check this string strictly, mainly symbol table.
 		// However, currentRetType uses INT for pointers usually.
 		retType += "*"
@@ -1072,25 +1158,25 @@ func (p *Parser) parseFunctionDecl() (Stmt, error) {
 				if p.peek().Type == INT {
 					p.advance()
 				}
-				if p.peek().Type == STAR {
+				for p.peek().Type == STAR {
 					p.advance()
-					param.IsPointer = true
+					param.PointerLevel++
 				}
 			} else if p.peek().Type == INT {
 				p.advance()
-				if p.peek().Type == STAR {
+				for p.peek().Type == STAR {
 					p.advance()
-					param.IsPointer = true
+					param.PointerLevel++
 				}
-			} else if p.peek().Type == BYTE {
+			} else if p.peek().Type == CHAR {
 				p.advance()
-				param.IsByte = true
-				if p.peek().Type == STAR {
+				param.IsChar = true
+				for p.peek().Type == STAR {
 					p.advance()
-					param.IsPointer = true
+					param.PointerLevel++
 				}
 			} else {
-				return nil, fmt.Errorf("line %d: expected parameter type (int or byte)", p.peek().Line)
+				return nil, fmt.Errorf("line %d: expected parameter type (int or char)", p.peek().Line)
 			}
 
 			paramName, err := p.expect(IDENTIFIER)
@@ -1125,37 +1211,31 @@ func (p *Parser) parseFunctionDecl() (Stmt, error) {
 
 // parseTopLevel parses either a function declaration or a statement.
 func (p *Parser) parseTopLevel() (Stmt, error) {
-	// Check for FunctionDecl: INT/BYTE IDENTIFIER LPAREN or INT/BYTE STAR IDENTIFIER LPAREN
+	qc := p.qualifierCount()
+	firstTok := p.peekAt(qc).Type
+
 	isFunc := false
-	if p.peek().Type == UNSIGNED {
-		// unsigned func()
-		if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-			isFunc = true
-		} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
-			isFunc = true
-		} else if p.peekAt(1).Type == INT {
-			// unsigned int func()
-			if p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
-				isFunc = true
-			} else if p.peekAt(2).Type == STAR && p.peekAt(3).Type == IDENTIFIER && p.peekAt(4).Type == LPAREN {
-				isFunc = true
-			}
+	if firstTok == UNSIGNED {
+		o := qc
+		next := o + 1
+		if p.peekAt(next).Type == INT {
+			next++ // skip optional "int" after "unsigned"
 		}
-	} else if p.peek().Type == INT || p.peek().Type == BYTE {
-		if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-			isFunc = true
-		} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
+		pc := p.pointerCount(next)
+		if p.peekAt(next+pc).Type == IDENTIFIER && p.peekAt(next+pc+1).Type == LPAREN {
 			isFunc = true
 		}
-	} else if p.peek().Type == VOID {
-		if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-			isFunc = true
-		} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
+	} else if firstTok == INT || firstTok == CHAR || firstTok == VOID {
+		o := qc
+		pc := p.pointerCount(o + 1)
+		if p.peekAt(o+1+pc).Type == IDENTIFIER && p.peekAt(o+2+pc).Type == LPAREN {
 			isFunc = true
 		}
 	}
+
 	// struct definitions can be top level
-	if p.peek().Type == STRUCT && p.peekAt(2).Type == LBRACE {
+	if firstTok == STRUCT && p.peekAt(qc+2).Type == LBRACE {
+		p.skipQualifiers()
 		return p.parseStructDecl()
 	}
 
@@ -1170,33 +1250,26 @@ func Parse(tokens []Token, rawSource string) ([]Stmt, error) {
 	p := NewParser(tokens, rawSource)
 	var stmts []Stmt
 	for p.peek().Type != EOF {
+		// Skip any leading qualifiers to peek at the effective type token.
+		qc := p.qualifierCount()
+
 		// 1. Check for Function Declaration
 		isFunc := false
-		if p.peek().Type == UNSIGNED {
-			// unsigned func()
-			if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-				isFunc = true
-			} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
-				isFunc = true
-			} else if p.peekAt(1).Type == INT {
-				// unsigned int func()
-				if p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
-					isFunc = true
-				} else if p.peekAt(2).Type == STAR && p.peekAt(3).Type == IDENTIFIER && p.peekAt(4).Type == LPAREN {
-					isFunc = true
-				}
+		firstTok := p.peekAt(qc).Type
+		if firstTok == UNSIGNED {
+			o := qc
+			next := o + 1
+			if p.peekAt(next).Type == INT {
+				next++ // skip optional "int" after "unsigned"
 			}
-		} else if p.peek().Type == INT || p.peek().Type == BYTE {
-			// Check lookahead for name(...) or *name(...)
-			if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-				isFunc = true
-			} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
+			pc := p.pointerCount(next)
+			if p.peekAt(next+pc).Type == IDENTIFIER && p.peekAt(next+pc+1).Type == LPAREN {
 				isFunc = true
 			}
-		} else if p.peek().Type == VOID {
-			if p.peekAt(1).Type == IDENTIFIER && p.peekAt(2).Type == LPAREN {
-				isFunc = true
-			} else if p.peekAt(1).Type == STAR && p.peekAt(2).Type == IDENTIFIER && p.peekAt(3).Type == LPAREN {
+		} else if firstTok == INT || firstTok == CHAR || firstTok == VOID {
+			o := qc
+			pc := p.pointerCount(o + 1)
+			if p.peekAt(o+1+pc).Type == IDENTIFIER && p.peekAt(o+2+pc).Type == LPAREN {
 				isFunc = true
 			}
 		}
@@ -1210,8 +1283,9 @@ func Parse(tokens []Token, rawSource string) ([]Stmt, error) {
 			continue
 		}
 
-		// 2. Check for Struct Definition
-		if p.peek().Type == STRUCT && p.peekAt(2).Type == LBRACE {
+		// 2. Check for Struct Definition (qualifiers before struct not common but handle it)
+		if firstTok == STRUCT && p.peekAt(qc+2).Type == LBRACE {
+			p.skipQualifiers()
 			s, err := p.parseStructDecl()
 			if err != nil {
 				return nil, err
@@ -1221,7 +1295,8 @@ func Parse(tokens []Token, rawSource string) ([]Stmt, error) {
 		}
 
 		// 3. Check for Global Variable Declaration
-		if p.peek().Type == INT || p.peek().Type == BYTE || p.peek().Type == STRUCT || p.peek().Type == UNSIGNED {
+		if firstTok == INT || firstTok == CHAR || firstTok == STRUCT || firstTok == UNSIGNED ||
+			isQualifier(p.peek().Type) {
 			v, err := p.parseVarDecl()
 			if err != nil {
 				return nil, err

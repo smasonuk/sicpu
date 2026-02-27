@@ -34,7 +34,7 @@ void main() {
 			src: `
 void main() {
     int x = (int)10;
-    byte b = (byte)x;
+    char b = (char)x;
 }
 `,
 		},

@@ -15,7 +15,7 @@ const (
 
 	// Keywords
 	INT      // "int"
-	BYTE     // "byte"
+	CHAR     // "char"
 	UNSIGNED // "unsigned"
 	VOID     // "void"
 	IF       // "if"
@@ -80,6 +80,12 @@ const (
 
 	LESS_EQ    // <=
 	GREATER_EQ // >=
+
+	// Type qualifiers (parsed and ignored by default)
+	VOLATILE // "volatile"
+	CONST    // "const"
+	STATIC   // "static"
+	EXTERN   // "extern"
 )
 
 // tokenNames is indexed by TokenType; the compiler enforces the length via the
@@ -90,7 +96,7 @@ var tokenNames = [...]string{
 	INTEGER:      "INTEGER",
 	STRING:       "STRING",
 	INT:          "INT",
-	BYTE:         "BYTE",
+	CHAR:         "CHAR",
 	UNSIGNED:     "UNSIGNED",
 	VOID:         "VOID",
 	IF:           "IF",
@@ -141,6 +147,12 @@ var tokenNames = [...]string{
 	LESS:         "LESS",
 	GREATER:      "GREATER",
 	UNSIGNED_LIT: "UNSIGNED_LIT",
+	LESS_EQ:      "LESS_EQ",
+	GREATER_EQ:   "GREATER_EQ",
+	VOLATILE:     "VOLATILE",
+	CONST:        "CONST",
+	STATIC:       "STATIC",
+	EXTERN:       "EXTERN",
 }
 
 func (tt TokenType) String() string {

@@ -49,17 +49,17 @@ void set_palette(int index, int rgb565) {
 }
 
 //DOES this work?
-int draw_pixel_8bpp(int x, int y, byte color_index) {
-    byte* vram = 0x8000;
+int draw_pixel_8bpp(int x, int y, char color_index) {
+    char* vram = 0x8000;
     *(vram + (y * 128) + x) = color_index;
     return 0;
 }
 
-int draw_pixel(int x, int y, byte color) {
+int draw_pixel(int x, int y, char color) {
     int* gbase = 0x8000;   
     int pixel_index = y * 128 + x;
-    int byte_index = pixel_index >> 1;         // which byte in the bank
-    int shift = (pixel_index & 1) << 2;        // bit offset within the byte (0 for even pixels, 4 for odd pixels)
+    int byte_index = pixel_index >> 1;         // which char in the bank
+    int shift = (pixel_index & 1) << 2;        // bit offset within the char (0 for even pixels, 4 for odd pixels)
     int current = *(gbase + byte_index);
     int mask = 15 << shift;                    // 0xF in the right nibble position
     int cleared = current & ~mask;             // zero out the target nibble
@@ -71,14 +71,14 @@ int draw_pixel(int x, int y, byte color) {
 
 
 // // Sets the pixel at (x,y) to 'color' (0-255) using 8bpp mode.
-void plot_8bpp(int x, int y, byte color) {
-    // VRAM starts at 0x8000. Each byte is a pixel.
-    byte* vram = (byte*)0x8000;
+void plot_8bpp(int x, int y, char color) {
+    // VRAM starts at 0x8000. Each char is a pixel.
+    char* vram = (char*)0x8000;
     vram[(y << 7) + x] = color; // y * 128 + x
 }
 
 // // Clears the entire graphics bank in one go using the CPU's FILL instruction.
-void clear_8bpp(byte color) {
+void clear_8bpp(char color) {
     // Pack the color into both bytes of a word (16-bit)
     int pattern = (color << 8) | color;
     // 128*128 pixels = 16384 bytes = 8192 words.

@@ -5,7 +5,7 @@
 int main() {
     print("VFS Test Start\n");
 
-    byte buffer[20];
+    char buffer[20];
     buffer[0] = 72;  // 'H'
     buffer[1] = 69;  // 'E'
     buffer[2] = 76;  // 'L'
@@ -13,14 +13,14 @@ int main() {
     buffer[4] = 79;  // 'O'
     buffer[5] = 0;   // Null terminator
     
-    byte* filename = "TEST.TXT";
+    char* filename = "TEST.TXT";
 
     print("Buffer before save: ");
     print(buffer);
     print("\n");
 
     print("Saving...\n");
-    // Save 6 bytes (hardware expects bytes despite spec saying words)
+    // Save 6 chars (hardware expects chars despite spec saying words)
     int err = vfs_write(filename, buffer, 6);
 
     if (err != 0) {
@@ -32,7 +32,7 @@ int main() {
     }
 
     print("Clearing buffer...\n");
-    // Clear 10 words (20 bytes)
+    // Clear 10 words (20 chars)
     memset(buffer, 10, 0);
 
     print("Buffer after clear: ");

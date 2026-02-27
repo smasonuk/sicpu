@@ -117,18 +117,22 @@ func (c *FunctionCall) String() string {
 
 // CastExpr represents (Type) Expr or (Type*) Expr
 type CastExpr struct {
-	Type      TokenType // INT or BYTE
-	IsPointer bool      // True if it has a '*'
-	Expr      Expr
+	Type         TokenType // INT, CHAR, STRUCT
+	StructName   string    // if Type == STRUCT
+	PointerLevel int       // 0 for scalar, 1 for *, 2 for **, etc.
+	Expr         Expr
 }
 
 func (*CastExpr) exprNode() {}
 func (c *CastExpr) String() string {
-	ptrStr := ""
-	if c.IsPointer {
-		ptrStr = "*"
+	typeStr := c.Type.String()
+	if c.Type == STRUCT {
+		typeStr += " " + c.StructName
 	}
-	return fmt.Sprintf("Cast(%s%s, %s)", c.Type, ptrStr, c.Expr)
+	for i := 0; i < c.PointerLevel; i++ {
+		typeStr += "*"
+	}
+	return fmt.Sprintf("Cast(%s, %s)", typeStr, c.Expr)
 }
 
 // IndexExpr represents Left[Index]
@@ -159,27 +163,27 @@ type Stmt interface {
 
 // VariableDecl represents  int name = expr;
 type VariableDecl struct {
-	Name       string
-	Init       Expr
-	IsArray    bool
-	ArraySizes []int
-	IsStruct   bool
-	StructName string
-	IsByte     bool
-	IsPointer  bool
-	IsUnsigned bool
+	Name         string
+	Init         Expr
+	IsArray      bool
+	ArraySizes   []int
+	IsStruct     bool
+	StructName   string
+	IsChar       bool
+	PointerLevel int // 0 for scalar, 1 for *, 2 for **, etc.
+	IsUnsigned   bool
 }
 
 func (*VariableDecl) stmtNode() {}
 func (d *VariableDecl) String() string {
 	typeStr := "int"
-	if d.IsByte {
-		typeStr = "byte"
+	if d.IsChar {
+		typeStr = "char"
 	} else if d.IsStruct {
 		typeStr = "struct " + d.StructName
 	}
 
-	if d.IsPointer {
+	for i := 0; i < d.PointerLevel; i++ {
 		typeStr += "*"
 	}
 

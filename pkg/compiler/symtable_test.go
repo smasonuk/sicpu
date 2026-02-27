@@ -34,9 +34,9 @@ func TestSymbolTable(t *testing.T) {
 	t.Run("ByteAllocation", func(t *testing.T) {
 		s := NewSymbolTable()
 		// byte b1;
-		sym1, _ := s.Allocate("b1", TypeInfo{IsByte: true}, 1)
+		sym1, _ := s.Allocate("b1", TypeInfo{IsChar: true}, 1)
 		// byte b2;
-		sym2, _ := s.Allocate("b2", TypeInfo{IsByte: true}, 1)
+		sym2, _ := s.Allocate("b2", TypeInfo{IsChar: true}, 1)
 		// int i;
 		sym3, _ := s.Allocate("i", TypeInfo{}, 2)
 

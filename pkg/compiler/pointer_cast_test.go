@@ -19,10 +19,10 @@ func TestPointerCasts(t *testing.T) {
 			`,
 		},
 		{
-			name: "cast_byte_pointer",
+			name: "cast_char_pointer",
 			source: `
 				int main() {
-					byte* p = (byte*)0x8000;
+					char* p = (char*)0x8000;
 					return 0;
 				}
 			`,
@@ -38,11 +38,11 @@ func TestPointerCasts(t *testing.T) {
 			`,
 		},
 		{
-			name: "cast_byte_pointer_dereference",
+			name: "cast_char_pointer_dereference",
 			source: `
 				int main() {
-					byte* p = (byte*)0x8000;
-					byte val = *p;
+					char* p = (char*)0x8000;
+					char val = *p;
 					return 0;
 				}
 			`,

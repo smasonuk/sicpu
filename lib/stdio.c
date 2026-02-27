@@ -2,8 +2,8 @@
 int* STDOUT_PORT = 0xFF00;
 int* MMIO_DEC = 0xFF01;
 
-// Prints a standard null-terminated byte string
-void print(byte* str) {
+// Prints a standard null-terminated char string
+void print(char* str) {
     while (*str != 0) {
         *STDOUT_PORT = *str;
         str++;
@@ -16,7 +16,7 @@ void print_int(int val) {
 }
 
 // Calculates the length of a null-terminated string
-int strlen(byte* str) {
+int strlen(char* str) {
     int len = 0;
     while (*str != 0) {
         len++;
@@ -26,7 +26,7 @@ int strlen(byte* str) {
 }
 
 // Copies the source string to the destination buffer
-void strcpy(byte* dest, byte* src) {
+void strcpy(char* dest, char* src) {
     while (*src != 0) {
         *dest = *src;
         dest++;
@@ -36,7 +36,7 @@ void strcpy(byte* dest, byte* src) {
 }
 
 // Compares two strings. Returns 0 if equal, <0 if s1 < s2, >0 if s1 > s2
-int strcmp(byte* s1, byte* s2) {
+int strcmp(char* s1, char* s2) {
     while (*s1 != 0 && *s2 != 0) {
         if (*s1 != *s2) {
             return *s1 - *s2;
@@ -48,7 +48,7 @@ int strcmp(byte* s1, byte* s2) {
 }
 
 // Concatenates src to the end of dest
-void strcat(byte* dest, byte* src) {
+void strcat(char* dest, char* src) {
     // Find end of dest
     while (*dest != 0) {
         dest++;
@@ -63,12 +63,12 @@ void strcat(byte* dest, byte* src) {
 }
 
 // Reverses a string in place
-void reverse(byte* s) {
+void reverse(char* s) {
     int len = strlen(s);
     if (len == 0) { return; }
 
-    byte* start = s;
-    byte* end = s;
+    char* start = s;
+    char* end = s;
     
     // Move end to the last character
     int i = 0;
@@ -78,7 +78,7 @@ void reverse(byte* s) {
     }
 
     while (start < end) {
-        byte temp = *start;
+        char temp = *start;
         *start = *end;
         *end = temp;
         start++;
@@ -87,7 +87,7 @@ void reverse(byte* s) {
 }
 
 // Converts an integer to a null-terminated string
-void itoa(int n, byte* s) {
+void itoa(int n, char* s) {
     int i = 0;
     int sign = n;
     if (sign < 0) {
@@ -102,7 +102,7 @@ void itoa(int n, byte* s) {
         return;
     }
 
-    byte* start = s;
+    char* start = s;
 
     while (n > 0) {
         int rem = n % 10;

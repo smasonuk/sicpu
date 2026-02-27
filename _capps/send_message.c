@@ -3,8 +3,8 @@
 
 int main() {
     int slot = find_peripheral("MSGSNDR");
-    byte* target = "Central Command";
-    byte* payload = "Ground control to major Tom";
+    char* target = "Central Command";
+    char* payload = "Ground control to major Tom";
     int len = strlen(payload);
 
     send_msg(slot, target, payload, len);

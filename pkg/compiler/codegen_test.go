@@ -58,7 +58,7 @@ func TestGenerate_UninitializedGlobals(t *testing.T) {
 	syms := NewSymbolTable()
 	stmts := []Stmt{
 		&VariableDecl{Name: "u1"}, // int is default
-		&VariableDecl{Name: "u2", IsByte: true}, // byte
+		&VariableDecl{Name: "u2", IsChar: true}, // char
 		&FunctionDecl{Name: "main", Body: &BlockStmt{}},
 	}
 

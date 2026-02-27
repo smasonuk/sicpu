@@ -20,7 +20,7 @@ func TestUnaryMinus_E2E(t *testing.T) {
 func TestCharLiteral_E2E(t *testing.T) {
 	src := `
 	int main() {
-		byte c = 'A';
+		char c = 'A';
         if (c == 65) return 1;
 		return 0;
 	}
@@ -35,7 +35,7 @@ func TestExplicitCast_E2E(t *testing.T) {
 	src := `
 	int main() {
 		int x = 0x1234;
-        byte b = (byte)x; // 0x34
+        char b = (char)x; // 0x34
         int y = (int)b;   // 0x0034
 		return y;
 	}

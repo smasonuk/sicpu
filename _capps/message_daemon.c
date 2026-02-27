@@ -48,8 +48,8 @@ void isr() {
 
         if ((pending & mask) != 0) {
 
-            byte buffer[256];
-            byte* filename = "INBOX.MSG";
+            char buffer[256];
+            char* filename = "INBOX.MSG";
 
             int size = vfs_size((int*)filename);
 

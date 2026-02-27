@@ -23,7 +23,7 @@ func TestParse(t *testing.T) {
 			name:  "Pointer Declaration",
 			input: "int* p = &x;",
 			expected: []Stmt{
-				&VariableDecl{Name: "p", Init: &UnaryExpr{Op: AND, Right: &VarRef{Name: "x"}}, IsPointer: true},
+				&VariableDecl{Name: "p", Init: &UnaryExpr{Op: AND, Right: &VarRef{Name: "x"}}, PointerLevel: 1},
 			},
 		},
 		{
