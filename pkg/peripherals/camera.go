@@ -69,6 +69,17 @@ func (cam *CameraPeripheral) Write16(offset uint16, val uint16) {
 func (cam *CameraPeripheral) Type() string { return CameraPeripheralType }
 
 func (cam *CameraPeripheral) Step() {}
+
+func clamp(v int) uint8 {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return uint8(v)
+}
+
 func (cam *CameraPeripheral) capture() {
 	w := int(cam.width)
 	h := int(cam.height)
