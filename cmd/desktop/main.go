@@ -3,6 +3,8 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"image"
+	"image/draw"
 	"log"
 	"os"
 	"time"
@@ -21,6 +23,27 @@ import (
 type Game struct {
 	vm          *cpu.CPU
 	graphicsImg *ebiten.Image // reused 128×128 bitmap canvas
+}
+
+func loadImage(fileName string) (*image.RGBA, error) {
+	imgFile, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer imgFile.Close()
+
+	img, _, err := image.Decode(imgFile)
+	if err != nil {
+		return nil, err
+	}
+
+	rgbaImg, ok := img.(*image.RGBA)
+	if !ok {
+		rgbaImg = image.NewRGBA(img.Bounds())
+		draw.Draw(rgbaImg, img.Bounds(), img, image.Point{}, draw.Src)
+	}
+
+	return rgbaImg, nil
 }
 
 func (g *Game) Update() error {
@@ -160,6 +183,12 @@ func main() {
 		}
 	}
 
+	cameraImage, err := loadImage("./frame_1.png")
+	if err != nil {
+		log.Fatalf("Failed to load demo image: %v", err)
+		os.Exit(1)
+	}
+
 	fullPath, baseDir, err := utils.GetPathInfo(filename)
 	sourceBytes, err := os.ReadFile(fullPath)
 	if err != nil {
@@ -181,18 +210,22 @@ func main() {
 		print("Generated Assembly:\n", *asm, "\n")
 	}
 
+	capFunc := func() *image.RGBA {
+		return cameraImage
+	}
+
 	// Register peripheral factories for hibernation restore.
 	cpu.RegisterPeripheral(peripherals.MessagePeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
 		return peripherals.NewMessageSender(c, slot)
 	})
 	cpu.RegisterPeripheral(peripherals.CameraPeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewCameraPeripheral(c, slot)
+		return peripherals.NewCameraPeripheral(c, slot, capFunc)
 	})
 
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)
 	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0))
-	vm.MountPeripheral(1, peripherals.NewCameraPeripheral(vm, 1))
+	vm.MountPeripheral(1, peripherals.NewCameraPeripheral(vm, 1, capFunc))
 
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")
