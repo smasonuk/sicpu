@@ -58,7 +58,7 @@ func runCodeWithVFS(t *testing.T, source string, setupVFS func(*cpu.CPU)) *cpu.C
 
 func TestVFS_WriteRead(t *testing.T) {
 	src := `
-	#include "../../lib/vfs.c"
+	#include <vfs.c>
 
 	int main() {
 		// Write "Hello" to test.txt
@@ -100,7 +100,7 @@ func TestVFS_WriteRead(t *testing.T) {
 
 func TestVFS_Delete(t *testing.T) {
 	src := `
-	#include "../../lib/vfs.c"
+	#include <vfs.c>
 
 	int main() {
 		int err = vfs_delete("existing.txt");

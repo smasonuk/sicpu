@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"gocpu/lib"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,12 +14,10 @@ type Macro struct {
 	Body string
 }
 
-// Preprocess scans the source code for `#include "filename"` and `#define NAME VALUE` directives.
+// Preprocess scans the source code for `#include` and `#define` directives.
 // It replaces includes with file content and substitutes defines.
-// It handles nested includes and prevents circular dependencies (include loops).
+// It handles nested includes and prevents circular dependencies.
 func Preprocess(src string, baseDir string) (string, error) {
-	// We use a map to track the current include stack to prevent cycles.
-	// We use a map to track definitions.
 	defines := make(map[string]Macro)
 	return preprocessRecursive(src, baseDir, make(map[string]bool), make(map[string]bool), defines)
 }
@@ -52,7 +51,6 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 
 			var args []string
 			// Check for function-like macro: #define FOO(a,b) ...
-			// Must have '(' immediately after name (no spaces).
 			if len(rest) > 0 && rest[0] == '(' {
 				// Parse args
 				closeParen := strings.Index(rest, ")")
@@ -71,13 +69,6 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 
 			value := strings.TrimSpace(rest)
 
-			// Perform substitution on the value itself using existing defines (for simple macros)
-			// For function-like macros, we do this at expansion time.
-			// Actually, C preprocessor expands body?
-			// Let's keep it simple: Expand simple macros in body immediately.
-			// But for function-like, arguments shadow global defines.
-			// So applyDefines needs to be careful.
-			// For now, we won't pre-expand body of function-like macros to avoid complexity with args.
 			if len(args) == 0 {
 				value = applyDefines(value, defines)
 			}
@@ -90,67 +81,88 @@ func preprocessRecursive(src string, baseDir string, visitedStack map[string]boo
 		}
 
 		if strings.HasPrefix(trimmed, "#include") {
-			// Expected format: #include "filename"
-			parts := strings.SplitN(trimmed, "\"", 3)
-			if len(parts) < 3 {
-				// Maybe using <filename>? Not supported per requirement.
+			isSystemInclude := false
+			filename := ""
+
+			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "#include"))
+			if len(rest) > 2 && rest[0] == '"' && rest[len(rest)-1] == '"' {
+				filename = rest[1 : len(rest)-1]
+				isSystemInclude = false
+			} else if len(rest) > 2 && rest[0] == '<' && rest[len(rest)-1] == '>' {
+				filename = rest[1 : len(rest)-1]
+				isSystemInclude = true
+			} else {
 				return "", fmt.Errorf("invalid include directive: %s", line)
 			}
-			filename := parts[1]
 
-			// Resolve path
-			// Priority 1: Relative to the current file's directory (standard C behavior)
-			fullPath := filepath.Join(baseDir, filename)
+			var contentBytes []byte
+			var err error
+			var includePath string // Used for cycle detection
+			var nextBaseDir string
 
-			// Check if file exists at relative path
-			_, err := os.Stat(fullPath)
-			if os.IsNotExist(err) {
-				// Priority 2: Relative to CWD / Project Root
-				// This allows including "lib/vfs.c" from anywhere if running from root
-				cwdPath, absErr := filepath.Abs(filename)
-				if absErr == nil {
-					if _, err := os.Stat(cwdPath); err == nil {
-						fullPath = cwdPath
+			if isSystemInclude {
+				// For system includes, the path is just the filename inside the embed.FS.
+				// e.g. "stdio.c"
+				includePath = filename
+
+				if visitedStack[includePath] {
+					return "", fmt.Errorf("circular include detected: <%s>", filename)
+				}
+				if alreadyProcessed[includePath] {
+					continue // Already processed, skip.
+				}
+
+				contentBytes, err = lib.CFiles.ReadFile("_c_files/" + filename)
+				if err != nil {
+					return "", fmt.Errorf("failed to read system include file <%s>: %v", filename, err)
+				}
+				nextBaseDir = "." // System headers don't have a "base directory"
+			} else {
+				// For user includes, resolve path against the filesystem
+				fullPath := filepath.Join(baseDir, filename)
+				if _, statErr := os.Stat(fullPath); os.IsNotExist(statErr) {
+					// Fallback to CWD-relative path
+					cwdPath, absErr := filepath.Abs(filename)
+					if absErr == nil {
+						if _, err := os.Stat(cwdPath); err == nil {
+							fullPath = cwdPath
+						}
 					}
+				}
+
+				absPath, absErr := filepath.Abs(fullPath)
+				if absErr != nil {
+					return "", absErr
+				}
+				includePath = absPath
+				nextBaseDir = filepath.Dir(fullPath)
+
+				if visitedStack[includePath] {
+					return "", fmt.Errorf("circular include detected: \"%s\"", filename)
+				}
+				if alreadyProcessed[includePath] {
+					continue // Already processed, skip.
+				}
+
+				contentBytes, err = os.ReadFile(fullPath)
+				if err != nil {
+					return "", fmt.Errorf("failed to read included file \"%s\" (path: %s): %v", filename, fullPath, err)
 				}
 			}
 
-			absPath, err := filepath.Abs(fullPath)
-			if err != nil {
-				return "", err
-			}
+			// Mark as processed for this branch of the include tree.
+			alreadyProcessed[includePath] = true
 
-			// Check for cycles in the current stack
-			if visitedStack[absPath] {
-				return "", fmt.Errorf("circular include detected: %s", filename)
-			}
-
-			// Check if this file has already been processed in a different branch of the include tree
-			// If so, we can skip reprocessing it to save time, since the result should be the same.
-			if alreadyProcessed[absPath] {
-				continue
-			}
-			alreadyProcessed[absPath] = true
-
-			// Read file
-			content, err := os.ReadFile(fullPath)
-			if err != nil {
-				return "", fmt.Errorf("failed to read included file %s (path: %s): %v", filename, fullPath, err)
-			}
-
-			// Create a new stack copy for the recursive call to allow diamond dependencies
+			// Create a new stack for the recursive call to allow diamond dependencies
 			newStack := make(map[string]bool)
 			for k, v := range visitedStack {
 				newStack[k] = v
 			}
-			newStack[absPath] = true
+			newStack[includePath] = true
 
 			// Recursively process the included file
-			// The baseDir for the included file is its own directory
-			// We pass the same 'defines' map to accumulate definitions across files.
-			includeDir := filepath.Dir(fullPath)
-			processedContent, err := preprocessRecursive(string(content),
-				includeDir,
+			processedContent, err := preprocessRecursive(string(contentBytes),
+				nextBaseDir,
 				newStack,
 				alreadyProcessed,
 				defines)
@@ -264,9 +276,6 @@ func applyDefines(input string, defines map[string]Macro) string {
 
 								// Expand body
 								if len(args) == len(macro.Args) {
-									// Build a single substitution map for all arguments and apply it in one
-									// pass. A single pass prevents earlier substitutions from being
-									// accidentally re-substituted by later argument names (argument bleeding).
 									body := macro.Body
 									argMap := make(map[string]Macro, len(macro.Args))
 									for k, argName := range macro.Args {
@@ -274,10 +283,6 @@ func applyDefines(input string, defines map[string]Macro) string {
 									}
 									body = applyDefines(body, argMap)
 
-									// Then recursively apply globals to the result.
-									// Note: This naive recursion might loop if a macro expands to itself
-									// (e.g. #define A A). Standard C prevents this by marking the macro as
-									// 'disabled' during expansion; we omit that check for simplicity.
 									expanded := applyDefines(body, defines)
 									sb.WriteString(expanded)
 

@@ -9,8 +9,8 @@ import (
 
 func Test_StringParsing(t *testing.T) {
 	source := `
-#include "../../lib/stdio.c"
-#include "../../lib/video.c"
+#include <stdio.c>
+#include <video.c>
 
 int main() {
     int* ctrl = 0xFF05;

@@ -1,5 +1,5 @@
-#include "../lib/stdio.c"
-#include "../lib/sys.c"
+#include <stdio.c>
+#include <sys.c>
 
 int main() {
     int slot = find_peripheral("MSGSNDR");

@@ -1,6 +1,6 @@
-#include "../lib/sys.c"
-#include "../lib/stdio.c"
-#include "../lib/vfs.c"
+#include <sys.c>
+#include <stdio.c>
+#include <vfs.c>
 
 int main() {
     print("VFS Test Start\n");

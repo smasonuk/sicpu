@@ -1,5 +1,5 @@
-#include "../lib/stdio.c"
-#include "../lib/sys.c"
+#include <stdio.c>
+#include <sys.c>
 
 // Copied from lib/vfs.c but renamed globals to avoid conflicts
 int* VFS_CMD_LOCAL    = 0xFF10;

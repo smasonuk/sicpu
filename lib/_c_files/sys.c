@@ -1,4 +1,4 @@
-#include "stdio.c"
+#include <stdio.c>
 
 int* MSG_CMD = 0xFC00; //writing into slot 0
 int* MSG_TO  = 0xFC02;
