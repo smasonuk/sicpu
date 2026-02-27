@@ -3,20 +3,24 @@ package peripherals
 import (
 	"bytes"
 	"gocpu/pkg/cpu"
-	"io"
-	"os"
-	"strings"
 	"testing"
 )
 
 func TestMessagePeripheral(t *testing.T) {
 	// Setup
 	c := cpu.NewCPU()
-	p := NewMessageSender(c, 0)
+
+	var gotTarget string
+	var gotBody []byte
+	dispatch := func(target string, body []byte) {
+		gotTarget = target
+		gotBody = body
+	}
+
+	p := NewMessageSender(c, 0, dispatch)
 	c.MountPeripheral(0, p)
 
-	// Action
-	// Manually inject "system" into memory at 0x1000
+	// Inject "system" into memory at 0x1000
 	target := "system"
 	for i := 0; i < len(target); i++ {
 		c.Memory[0x1000+i] = target[i]
@@ -34,25 +38,16 @@ func TestMessagePeripheral(t *testing.T) {
 	p.Write16(0x04, 0x2000)
 	p.Write16(0x06, 4)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	// Trigger send
 	p.Write16(0x00, 1)
 
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
+	// Assert dispatch was called with correct data
+	if gotTarget != "system" {
+		t.Errorf("expected target %q, got %q", "system", gotTarget)
+	}
 
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
-
-	// Assertion
-	expected := "[Message HW] To: system | Body: deadbeef\n"
-	if !strings.Contains(output, expected) {
-		t.Errorf("Expected output to contain %q, got %q", expected, output)
+	expectedBody := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+	if !bytes.Equal(gotBody, expectedBody) {
+		t.Errorf("expected body %x, got %x", expectedBody, gotBody)
 	}
 }

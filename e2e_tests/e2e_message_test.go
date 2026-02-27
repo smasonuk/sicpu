@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"gocpu/pkg/compiler"
 	"gocpu/pkg/cpu"
 	"gocpu/pkg/peripherals"
@@ -13,7 +14,7 @@ import (
 
 func TestSendMessageIntegration(t *testing.T) {
 	// 1. Read C source
-	sourceBytes, err := os.ReadFile("_capps/send_message.c")
+	sourceBytes, err := os.ReadFile("../_capps/send_message.c")
 	if err != nil {
 		t.Fatalf("Failed to read source file: %v", err)
 	}
@@ -27,7 +28,9 @@ func TestSendMessageIntegration(t *testing.T) {
 
 	// 3. Setup CPU and Peripheral
 	vm := cpu.NewCPU()
-	p := peripherals.NewMessageSender(vm, 0)
+	p := peripherals.NewMessageSender(vm, 0, func(target string, body []byte) {
+		fmt.Printf("[Message HW] To: %s | Body: %s\n", target, string(body))
+	})
 	vm.MountPeripheral(0, p)
 
 	// 4. Load Code

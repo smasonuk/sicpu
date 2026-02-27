@@ -2,12 +2,12 @@ package compiler
 
 import (
 	"bytes"
-	"testing"
 	"gocpu/pkg/asm"
 	"gocpu/pkg/cpu"
+	"testing"
 )
 
-func TestEndToEnd_StringParsing(t *testing.T) {
+func Test_StringParsing(t *testing.T) {
 	source := `
 #include "../../lib/stdio.c"
 #include "../../lib/video.c"

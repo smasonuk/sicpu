@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -61,16 +62,20 @@ func main() {
 		print("Generated Assembly:\n", *asm, "\n")
 	}
 
+	dispatch := func(target string, body []byte) {
+		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+	}
+
 	// Register peripheral factories for hibernation restore.
 	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewMessageSender(c, slot)
+		return peripherals.NewMessageSender(c, slot, dispatch)
 	})
 	// cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
 	// 	return peripherals.NewDMATester(c, slot)
 	// })
 
 	vm := cpu.NewCPU("gocpu_vfs")
-	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0))
+	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0, dispatch))
 
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")

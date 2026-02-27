@@ -8,7 +8,7 @@ import (
 	"gocpu/pkg/cpu"
 )
 
-func TestCompilerAndCPU_EndToEnd(t *testing.T) {
+func TestCompilerAndCPU(t *testing.T) {
 	// 1. Define C source
 	source := `
 int fib(int n) {

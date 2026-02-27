@@ -8,18 +8,22 @@ import (
 
 const MessagePeripheralType = "MessagePeripheral"
 
+type DispatchFunc func(target string, body []byte)
+
 type MessageSender struct {
 	c        *cpu.CPU
 	slot     uint8
 	toAddr   uint16
 	bodyAddr uint16
 	bodyLen  uint16
+	dispatch DispatchFunc
 }
 
-func NewMessageSender(c *cpu.CPU, slot uint8) *MessageSender {
+func NewMessageSender(c *cpu.CPU, slot uint8, dispatch DispatchFunc) *MessageSender {
 	return &MessageSender{
-		c:    c,
-		slot: slot,
+		c:        c,
+		slot:     slot,
+		dispatch: dispatch,
 	}
 }
 
@@ -91,12 +95,11 @@ func (m *MessageSender) sendMessage() {
 	body := make([]byte, m.bodyLen)
 	for i := uint16(0); i < m.bodyLen; i++ {
 		body[i] = m.c.ReadByte(m.bodyAddr + i)
-		fmt.Printf("[Message HW] Read byte %d: 0x%02X, ascii: '%c', decimal: %d\n", i, body[i], body[i], body[i])
 	}
 
-	// fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
-
-	bodyStr := string(body)
-
-	fmt.Printf("[Message HW] To: %s | Body: %s\n", target, bodyStr)
+	if m.dispatch != nil {
+		m.dispatch(target, body)
+	} else {
+		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+	}
 }

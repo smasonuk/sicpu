@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-func TestMessageReceiverEndToEnd(t *testing.T) {
-	srcPath := "_capps/message_daemon.c"
+func TestMessageReceiver(t *testing.T) {
+	srcPath := "../_capps/message_daemon.c"
 	sourceBytes, err := os.ReadFile(srcPath)
 	if err != nil {
 		t.Fatalf("Failed to read source file: %v", err)

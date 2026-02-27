@@ -214,9 +214,13 @@ func main() {
 		return cameraImage
 	}
 
+	dispatch := func(target string, body []byte) {
+		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+	}
+
 	// Register peripheral factories for hibernation restore.
 	cpu.RegisterPeripheral(peripherals.MessagePeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewMessageSender(c, slot)
+		return peripherals.NewMessageSender(c, slot, dispatch)
 	})
 	cpu.RegisterPeripheral(peripherals.CameraPeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
 		return peripherals.NewCameraPeripheral(c, slot, capFunc)
@@ -224,7 +228,7 @@ func main() {
 
 	// 3. Initialize CPU (loads any previously saved VFS files from storagePath)
 	vm := cpu.NewCPU(storagePath)
-	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0))
+	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0, dispatch))
 	vm.MountPeripheral(1, peripherals.NewCameraPeripheral(vm, 1, capFunc))
 
 	if len(machineCode) > len(vm.Memory) {

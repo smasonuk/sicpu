@@ -13,7 +13,7 @@ import (
 
 func TestFileIOApp(t *testing.T) {
 	// 1. Read source
-	srcPath := "_capps/file_io_test.c"
+	srcPath := "../_capps/file_io_test.c"
 	srcBytes, err := os.ReadFile(srcPath)
 	if err != nil {
 		t.Fatalf("Failed to read source: %v", err)
