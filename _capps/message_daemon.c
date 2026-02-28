@@ -61,29 +61,41 @@ void isr() {
         if ((pending & mask) != 0) {
 
             char buffer[256];
+            char sender_buffer[256];
             char* filename = "INBOX.MSG";
+            char* sender_filename = "SENDER.MSG";
 
             int size = vfs_size((int*)filename);
+            int sender_size = vfs_size((int*)sender_filename);
 
-            if (size >= 0) {
-                if (size < 255) {
-                    int err = vfs_read((int*)filename, (int*)buffer);
-                    if (err == 0) {
+            if (size >= 0 && sender_size >= 0) {
+                if (size < 255 && sender_size < 255) {
+                    int err_sender = vfs_read((int*)sender_filename, (int*)sender_buffer);
+                    int err_msg = vfs_read((int*)filename, (int*)buffer);
+                    
+                    if (err_sender == 0 && err_msg == 0) {
+                        sender_buffer[sender_size] = 0;
                         buffer[size] = 0;
-                        print("New Message Received: ");
+                        
+                        print("Message Received from ");
+                        print(sender_buffer);
+                        print(": ");
                         print(buffer);
                         print("\n");
                     } else {
-                        print("Error reading inbox: ");
-                        print_int(err);
+                        print("Error reading messages. Sender err: ");
+                        print_int(err_sender);
+                        print(", Msg err: ");
+                        print_int(err_msg);
                         print("\n");
                     }
                 } else {
-                    print("Error: Message too large\n");
+                    print("Error: Message or Sender too large\n");
                 }
                 vfs_delete((int*)filename);
+                vfs_delete((int*)sender_filename);
             } else {
-                print("Error: INBOX.MSG not found or invalid\n");
+                print("Error: INBOX.MSG or SENDER.MSG not found or invalid\n");
             }
 
             int* slot_addr = 0xFC00 + (RECV_SLOT * 16);

@@ -76,7 +76,8 @@ func TestMessageReceiver(t *testing.T) {
 
 	// Inject
 	msg := "HELLO_WORLD"
-	if err := mr.PushMessage([]byte(msg)); err != nil {
+	sender := "Earth"
+	if err := mr.PushMessage(sender, []byte(msg)); err != nil {
 		t.Fatalf("PushMessage failed: %v", err)
 	}
 
@@ -84,7 +85,7 @@ func TestMessageReceiver(t *testing.T) {
 	processed := false
 	deadline = time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if strings.Contains(outputBuf.String(), "New Message Received: HELLO_WORLD") {
+		if strings.Contains(outputBuf.String(), "Message Received from Earth: HELLO_WORLD") {
 			processed = true
 			break
 		}

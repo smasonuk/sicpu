@@ -59,14 +59,21 @@ func (m *MessageReceiver) Write16(offset uint16, val uint16) {
 				return
 			}
 
-			if len(data) < 2 {
+			if len(data) < 1 {
 				// Corrupt, delete
 				_ = m.c.Disk.Delete(".msgq.sys")
 				return
 			}
 
-			msgLen := binary.LittleEndian.Uint16(data[0:2])
-			totalLen := 2 + int(msgLen)
+			senderLen := int(data[0])
+			if len(data) < 1+senderLen+2 {
+				// Corrupt, delete
+				_ = m.c.Disk.Delete(".msgq.sys")
+				return
+			}
+
+			msgLen := binary.LittleEndian.Uint16(data[1+senderLen : 1+senderLen+2])
+			totalLen := 1 + senderLen + 2 + int(msgLen)
 
 			if len(data) < totalLen {
 				// Incomplete, corrupt
@@ -105,14 +112,25 @@ func (m *MessageReceiver) Step() {
 		return
 	}
 
-	if len(data) < 2 {
+	if len(data) < 1 {
 		// Corrupt or empty queue file, delete it
 		_ = m.c.Disk.Delete(".msgq.sys")
 		return
 	}
 
-	msgLen := binary.LittleEndian.Uint16(data[0:2])
-	totalLen := 2 + int(msgLen)
+	senderLen := int(data[0])
+	if len(data) < 1+senderLen+2 {
+		// Corrupt or empty queue file, delete it
+		_ = m.c.Disk.Delete(".msgq.sys")
+		return
+	}
+
+	senderBytes := data[1 : 1+senderLen]
+	sender := make([]byte, senderLen)
+	copy(sender, senderBytes)
+
+	msgLen := binary.LittleEndian.Uint16(data[1+senderLen : 1+senderLen+2])
+	totalLen := 1 + senderLen + 2 + int(msgLen)
 
 	if len(data) < totalLen {
 		fmt.Printf("[MSGRECV] Incomplete message in queue\n")
@@ -120,7 +138,14 @@ func (m *MessageReceiver) Step() {
 	}
 
 	payload := make([]byte, msgLen)
-	copy(payload, data[2:totalLen])
+	copy(payload, data[1+senderLen+2:totalLen])
+
+	// Write sender to SENDER.MSG
+	err = m.c.Disk.Write("SENDER.MSG", sender)
+	if err != nil {
+		fmt.Printf("[MSGRECV] Failed to write SENDER.MSG: %v\n", err)
+		return
+	}
 
 	// Write payload to INBOX.MSG
 	err = m.c.Disk.Write("INBOX.MSG", payload)
@@ -135,7 +160,7 @@ func (m *MessageReceiver) Step() {
 	m.c.TriggerPeripheralInterrupt(m.slot)
 }
 
-func (m *MessageReceiver) PushMessage(msg []byte) error {
+func (m *MessageReceiver) PushMessage(sender string, msg []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -147,10 +172,18 @@ func (m *MessageReceiver) PushMessage(msg []byte) error {
 	}
 
 	// Append new message
-	// Format: [Len: uint16][Body]
-	newMsg := make([]byte, 2+len(msg))
-	binary.LittleEndian.PutUint16(newMsg[0:2], uint16(len(msg)))
-	copy(newMsg[2:], msg)
+	// Format: [SenderLen: uint8][SenderStr][BodyLen: uint16][Body]
+	senderLen := len(sender)
+	if senderLen > 255 {
+		senderLen = 255 // Truncate to fit in uint8 if it's crazy long
+		sender = sender[:255]
+	}
+
+	newMsg := make([]byte, 1+senderLen+2+len(msg))
+	newMsg[0] = uint8(senderLen)
+	copy(newMsg[1:], []byte(sender))
+	binary.LittleEndian.PutUint16(newMsg[1+senderLen:1+senderLen+2], uint16(len(msg)))
+	copy(newMsg[1+senderLen+2:], msg)
 
 	finalData := append(currentData, newMsg...)
 

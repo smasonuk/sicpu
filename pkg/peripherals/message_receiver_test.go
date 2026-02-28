@@ -15,7 +15,8 @@ func TestMessageReceiver_PushMessage(t *testing.T) {
 	c.MountPeripheral(0, mr)
 
 	msg1 := []byte("Hello")
-	err := mr.PushMessage(msg1)
+	sender1 := "Earth"
+	err := mr.PushMessage(sender1, msg1)
 	if err != nil {
 		t.Fatalf("PushMessage failed: %v", err)
 	}
@@ -25,21 +26,27 @@ func TestMessageReceiver_PushMessage(t *testing.T) {
 		t.Fatalf("Failed to read queue: %v", err)
 	}
 
-	expectedLen := 2 + len(msg1)
+	expectedLen := 1 + len(sender1) + 2 + len(msg1)
 	if len(data) != expectedLen {
 		t.Fatalf("Expected queue length %d, got %d", expectedLen, len(data))
 	}
+	
+	senderLen := int(data[0])
+	if senderLen != len(sender1) {
+		t.Errorf("Expected sender length %d, got %d", len(sender1), senderLen)
+	}
 
-	length := binary.LittleEndian.Uint16(data[0:2])
+	length := binary.LittleEndian.Uint16(data[1+senderLen : 1+senderLen+2])
 	if length != uint16(len(msg1)) {
 		t.Errorf("Expected length %d, got %d", len(msg1), length)
 	}
-	if !bytes.Equal(data[2:], msg1) {
-		t.Errorf("Expected payload %q, got %q", msg1, data[2:])
+	if !bytes.Equal(data[1+senderLen+2:], msg1) {
+		t.Errorf("Expected payload %q, got %q", msg1, data[1+senderLen+2:])
 	}
 
 	msg2 := []byte("World")
-	err = mr.PushMessage(msg2)
+	sender2 := "Mars"
+	err = mr.PushMessage(sender2, msg2)
 	if err != nil {
 		t.Fatalf("PushMessage 2 failed: %v", err)
 	}
@@ -49,7 +56,7 @@ func TestMessageReceiver_PushMessage(t *testing.T) {
 		t.Fatalf("Failed to read queue: %v", err)
 	}
 
-	expectedLen2 := expectedLen + 2 + len(msg2)
+	expectedLen2 := expectedLen + 1 + len(sender2) + 2 + len(msg2)
 	if len(data) != expectedLen2 {
 		t.Fatalf("Expected queue length %d, got %d", expectedLen2, len(data))
 	}
@@ -61,7 +68,8 @@ func TestMessageReceiver_Step(t *testing.T) {
 	c.MountPeripheral(2, mr)
 
 	msg := []byte("TEST_PAYLOAD")
-	_ = mr.PushMessage(msg)
+	sender := "Venus"
+	_ = mr.PushMessage(sender, msg)
 
 	// Step 1: Process message
 	mr.Step()
@@ -83,6 +91,15 @@ func TestMessageReceiver_Step(t *testing.T) {
 	}
 	if !bytes.Equal(inbox, msg) {
 		t.Errorf("INBOX.MSG content mismatch. Want %q, got %q", msg, inbox)
+	}
+
+	// Check SENDER.MSG
+	senderInbox, err := c.Disk.Read("SENDER.MSG")
+	if err != nil {
+		t.Fatalf("SENDER.MSG not created: %v", err)
+	}
+	if string(senderInbox) != sender {
+		t.Errorf("SENDER.MSG content mismatch. Want %q, got %q", sender, senderInbox)
 	}
 
 	// Check Queue (should STILL EXIST)
@@ -118,14 +135,18 @@ func TestMessageReceiver_MultipleMessages(t *testing.T) {
 	mr := NewMessageReceiver(c, 0)
 	c.MountPeripheral(0, mr)
 
-	_ = mr.PushMessage([]byte("A"))
-	_ = mr.PushMessage([]byte("B"))
+	_ = mr.PushMessage("Earth", []byte("A"))
+	_ = mr.PushMessage("Mars", []byte("B"))
 
 	// Process first
 	mr.Step()
 	inbox, _ := c.Disk.Read("INBOX.MSG")
 	if string(inbox) != "A" {
 		t.Errorf("Expected 'A', got %q", inbox)
+	}
+	senderInbox, _ := c.Disk.Read("SENDER.MSG")
+	if string(senderInbox) != "Earth" {
+		t.Errorf("Expected 'Earth', got %q", senderInbox)
 	}
 
 	// Queue should still exist with 'A' and 'B'
@@ -142,6 +163,10 @@ func TestMessageReceiver_MultipleMessages(t *testing.T) {
 	inbox, _ = c.Disk.Read("INBOX.MSG")
 	if string(inbox) != "B" {
 		t.Errorf("Expected 'B', got %q", inbox)
+	}
+	senderInbox, _ = c.Disk.Read("SENDER.MSG")
+	if string(senderInbox) != "Mars" {
+		t.Errorf("Expected 'Mars', got %q", senderInbox)
 	}
 
 	mr.Write16(0x00, 1) // ACK
