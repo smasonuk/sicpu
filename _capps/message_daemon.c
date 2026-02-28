@@ -40,7 +40,19 @@ int* MMIO_SLOT_BASE = 0xFC00;
 void isr() {
     int pending = *INT_MASK;
 
-    if (RECV_SLOT != -1) {
+
+    // from: local
+    // to: navigation@local
+
+    // from: navigation@local
+    // to: @local
+
+    // from: earth
+    // to navifation@probe_id
+    // message: move_to("x,y,z", "speed")
+
+
+    if (RECV_SLOT != -1) { // this is the slot where the message reciever is attatched
         int mask = 1;
         for (int i = 0; i < RECV_SLOT; i++) {
             mask = mask * 2;
