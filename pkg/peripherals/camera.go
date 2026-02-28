@@ -110,11 +110,6 @@ func (cam *CameraPeripheral) capture() {
 		img = cam.captureFunc()
 	}
 
-	// debug write image to file as png
-	if img != nil {
-		saveImageToFile(img, "capture3.png")
-	}
-
 	if img != nil {
 		dstRect := image.Rect(0, 0, w, h)
 		scaledImg := image.NewRGBA(dstRect)
