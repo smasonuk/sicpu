@@ -1,6 +1,6 @@
-#define CAMERA_BUF_OFFSET   1
-#define CAMERA_W_OFFSET     2
-#define CAMERA_H_OFFSET     3
+#define CAMERA_BUF_OFFSET   1*2
+#define CAMERA_W_OFFSET     2*2
+#define CAMERA_H_OFFSET     3*2
 
 
 int takepicture(int buffer_start) {

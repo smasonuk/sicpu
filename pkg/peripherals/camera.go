@@ -1,8 +1,11 @@
 package peripherals
 
 import (
+	"fmt"
 	"gocpu/pkg/cpu"
 	"image"
+	"image/png"
+	"os"
 
 	"golang.org/x/image/draw"
 )
@@ -80,6 +83,18 @@ func clamp(v int) uint8 {
 	return uint8(v)
 }
 
+func saveImageToFile(img image.Image, filename string) {
+	f, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("EARTH: Failed to create %s: %v\n", filename, err)
+		return
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		fmt.Printf("EARTH: Failed to encode image: %v\n", err)
+	}
+}
+
 func (cam *CameraPeripheral) capture() {
 	w := int(cam.width)
 	h := int(cam.height)
@@ -93,6 +108,11 @@ func (cam *CameraPeripheral) capture() {
 	var img *image.RGBA
 	if cam.captureFunc != nil {
 		img = cam.captureFunc()
+	}
+
+	// debug write image to file as png
+	if img != nil {
+		saveImageToFile(img, "capture3.png")
 	}
 
 	if img != nil {

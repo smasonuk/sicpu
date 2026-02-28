@@ -1,12 +1,12 @@
-#define MSGSNDR_TO_OFFSET   1
-#define MSGSNDR_BODY_OFFSET 2
-#define MSGSNDR_LEN_OFFSET  3
+#define MSGSNDR_TO_OFFSET   1*2
+#define MSGSNDR_BODY_OFFSET 2*2
+#define MSGSNDR_LEN_OFFSET  3*2
 #define MSGSNDR_SEND        1
 
 int send_message(char* send_to_address, int image_buffer_address, int image_size) {
     int* sender = find_peripheral("MSGSNDR");
     if (sender == 0) {
-        print("Camera not found!\n");
+        print("MSGSNDR not found!\n");
         return 1;
     }
 

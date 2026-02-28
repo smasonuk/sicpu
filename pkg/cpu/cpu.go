@@ -156,10 +156,10 @@ type CPUState struct {
 	GraphicsBanksFront [4][16384]byte
 
 	// MDU State
-	MathA         uint16
-	MathOp        uint16
-	MathRes       uint16
-	MathRemainder uint16
+	MathA             uint16
+	MathOp            uint16
+	MathRes           uint16
+	MathRemainder     uint16
 	PeripheralIntMask uint16
 }
 
@@ -468,6 +468,12 @@ func (c *CPU) WriteByte(addr uint16, val byte) {
 	}
 	c.Memory[addr] = val
 }
+
+// WriteByteRaw writes a byte directly to Memory, bypassing MMIO, VRAM, and expansion bus interception.
+// This is used by peripherals (like Camera) to write bulk data into RAM without side effects.
+// func (c *CPU) WriteByteRaw(addr uint16, val byte) {
+// 	c.Memory[addr] = val
+// }
 
 func (c *CPU) handleMMIOWrite16(addr uint16, val uint16) {
 	switch addr {
