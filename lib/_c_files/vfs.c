@@ -42,7 +42,7 @@ int vfs_read(int* filename, int* buffer) {
 
 // Gets the size of a file in words.
 // Returns the size, or -1 if the file doesn't exist.
-int vfs_size(int* filename) {
+int vfs_size_calc(int* filename) {
     *VFS_NAME = filename;
     *VFS_CMD  = 3; // Trigger Size Command
 

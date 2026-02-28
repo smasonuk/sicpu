@@ -1,12 +1,7 @@
-#define CAMERA_BUF_OFFSET   0x0002
-#define CAMERA_W_OFFSET     0x0004
-#define CAMERA_H_OFFSET     0x0006
+#define CAMERA_BUF_OFFSET   1
+#define CAMERA_W_OFFSET     2
+#define CAMERA_H_OFFSET     3
 
-
-// Image buffer: 128x128 = 16384 bytes, placed safely in mid-RAM (away from
-// code at 0x0010 and stack at 0xFFFE).
-#define IMAGE_BUFFER 0x4000
-#define IMAGE_SIZE   16384
 
 int takepicture(int buffer_start) {
     int CAM_CAPTURE_COMMAND = 1;
@@ -17,6 +12,9 @@ int takepicture(int buffer_start) {
         return 1;
     }
 
+    print_int(buffer_start);
+    print("\n" );
+
     //capture image
     int* cam_buf = (int*)(cam + CAMERA_BUF_OFFSET);
     *cam_buf = buffer_start;
@@ -25,6 +23,8 @@ int takepicture(int buffer_start) {
     int* cam_h = (int*)(cam + CAMERA_H_OFFSET);
     *cam_h = 128;
 
+    print("1!\n");
     // tell the camera to capture the image
     *cam = CAM_CAPTURE_COMMAND; 
+    print("2!\n");
 }

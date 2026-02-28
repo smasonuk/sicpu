@@ -1,6 +1,6 @@
-#define MSGSNDR_TO_OFFSET   0x0002
-#define MSGSNDR_BODY_OFFSET 0x0004
-#define MSGSNDR_LEN_OFFSET  0x0006
+#define MSGSNDR_TO_OFFSET   1
+#define MSGSNDR_BODY_OFFSET 2
+#define MSGSNDR_LEN_OFFSET  3
 #define MSGSNDR_SEND        1
 
 int send_message(char* send_to_address, int image_buffer_address, int image_size) {
