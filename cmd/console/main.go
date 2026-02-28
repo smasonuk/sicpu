@@ -9,6 +9,7 @@ import (
 
 	"gocpu/pkg/compiler"
 	"gocpu/pkg/cpu"
+	"gocpu/pkg/devices"
 	"gocpu/pkg/peripherals"
 	"gocpu/pkg/utils"
 )
@@ -69,15 +70,26 @@ func main() {
 	}
 
 	// Register peripheral factories for hibernation restore.
-	cpu.RegisterPeripheral("MessagePeripheral", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-		return peripherals.NewMessageSender(c, slot, dispatch)
+	cpu.RegisterPeripheral(peripherals.MessagePeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewMessageSender(c, slot, c.DispatchMessage)
 	})
-	// cpu.RegisterPeripheral("DMATester", func(c *cpu.CPU, slot uint8) cpu.Peripheral {
-	// 	return peripherals.NewDMATester(c, slot)
-	// })
+	cpu.RegisterPeripheral(peripherals.MessageReceiverType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
+		return peripherals.NewMessageReceiver(c, slot)
+	})
+
+	cpu.RegisterMessageDevice(devices.NavigationDeviceType, func() cpu.MessageDevice {
+		return devices.NewNavigationDevice()
+	})
 
 	vm := cpu.NewCPU("gocpu_vfs")
-	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0, dispatch))
+
+	msgReceiver := peripherals.NewMessageReceiver(vm, 1)
+	vm.MessagePusher = msgReceiver.PushMessage
+	vm.MountPeripheral(1, msgReceiver)
+
+	vm.MountPeripheral(0, peripherals.NewMessageSender(vm, 0, vm.DispatchMessage))
+
+	vm.MountMessageDevice("navigation@local", devices.NewNavigationDevice())
 
 	if len(machineCode) > len(vm.Memory) {
 		log.Fatalf("Program too large for memory")
