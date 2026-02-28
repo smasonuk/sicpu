@@ -1,5 +1,5 @@
-#include "../lib/sys.c"
-#include "../lib/video.c"
+#include <sys.c>
+#include <video.c>
 
 void setup_rgb332_palette() {
     int i = 0;

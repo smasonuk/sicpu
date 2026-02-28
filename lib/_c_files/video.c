@@ -1,3 +1,10 @@
+#include <stdio.c>
+#include <sys.c>
+#include <message.c>
+#include <cam.c>
+
+
+
 // Video Hardware Ports
 int* VIDEO_FLIP_PORT = 0xFF06;
 int* VIDEO_CTRL = 0xFF05;
@@ -8,6 +15,13 @@ int GRAPHICS_MODE = 2;
 int BUFFERED_MODE = 4;
 int COLOR_8BPP_MODE = 8;
 int* active_bank = 0xFF02;
+
+
+// Image buffer: 128x128 = 16384 bytes, placed safely in mid-RAM (away from
+// code at 0x0010 and stack at 0xFFFE).
+#define IMAGE_BUFFER 0x4000
+#define IMAGE_SIZE   16384
+
 
 void set_active_bank(int bank) {
     *active_bank = bank;
@@ -90,4 +104,20 @@ void init_8bpp() {
     change_video_mode_graphics_8bpp();
     enable_buffered_mode();
     set_active_bank(0);
+}
+
+int take_picture_and_send(char* send_to_address) {
+    int CAM_CAPTURE_COMMAND = 1;
+
+    int* cam = find_peripheral("CAMERA");
+    if (cam == 0) {
+        print("Camera not found!\n");
+        return 1;
+    }
+
+    takepicture(IMAGE_BUFFER);
+
+    send_message(send_to_address, IMAGE_BUFFER, IMAGE_SIZE);
+
+    return 0;
 }

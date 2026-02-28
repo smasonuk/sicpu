@@ -15,8 +15,8 @@
 // CPU.WriteByte in the 0x8000-0xBFFF range routes straight into
 // GraphicsBanks[CurrentBank], so the camera fills VRAM directly.
 
-#include "../lib/sys.c"
-#include "../lib/video.c"
+#include <sys.c>
+#include <video.c>
 
 // setup_rgb332_palette — fills all 256 palette slots so that
 // palette[i] is the RGB565 colour for RGB332 packed value i.
