@@ -11,8 +11,8 @@
 // that corresponds to RGB332 colour i, the camera byte can be used
 // directly as a palette index — zero per-pixel conversion needed.
 //
-// Memory: the camera buffer is set to 0x8000 (VRAM start).
-// CPU.WriteByte in the 0x8000-0xBFFF range routes straight into
+// Memory: the camera buffer is set to 0xB600 (VRAM start).
+// CPU.WriteByte in the 0xB600-0xF5FF range routes straight into
 // GraphicsBanks[CurrentBank], so the camera fills VRAM directly.
 
 #include <sys.c>
@@ -63,10 +63,10 @@ int main() {
         return 1;
     }
 
-    // 4. Aim the camera buffer at VRAM (0x8000).
-    //    Each WriteByte to 0x8000-0xBFFF lands in GraphicsBanks[CurrentBank],
+    // 4. Aim the camera buffer at VRAM (0xB600).
+    //    Each WriteByte to 0xB600-0xF5FF lands in GraphicsBanks[CurrentBank],
     //    so the capture fills the active bank directly — no extra copy step.
-    cam[1] = 0x8000;   // offset 0x02: buffer address
+    cam[1] = 0xB600;   // offset 0x02: buffer address
     cam[2] = 128;       // offset 0x04: width
     cam[3] = 128;       // offset 0x06: height
 

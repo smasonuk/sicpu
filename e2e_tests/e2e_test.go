@@ -77,8 +77,8 @@ int main() {
 		t.Errorf("Expected Memory[0x3000] to be 8, got %d", vm.Read16(0x3000))
 	}
 
-	// Verify SP equals 0xFFFE (stack fully unwound; initial SP is 0xFFFE)
-	if vm.SP != 0xFFFE {
-		t.Errorf("Expected SP to be 0xFFFE, got 0x%04X", vm.SP)
+	// Verify SP equals 0xB5FE (stack fully unwound; initial SP is 0xB5FE)
+	if vm.SP != 0xB5FE {
+		t.Errorf("Expected SP to be 0xB5FE, got 0x%04X", vm.SP)
 	}
 }

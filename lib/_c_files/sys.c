@@ -1,9 +1,9 @@
 #include <stdio.c>
 
-int* MSG_CMD = 0xFC00; //writing into slot 0
-int* MSG_TO  = 0xFC02;
-int* MSG_BODY = 0xFC04;
-int* MSG_LEN = 0xFC06;
+int* MSG_CMD = 0xFE00; //writing into slot 0
+int* MSG_TO  = 0xFE02;
+int* MSG_BODY = 0xFE04;
+int* MSG_LEN = 0xFE06;
 
 
 void enable_interrupts() {
@@ -39,12 +39,12 @@ void memcpy(int* dest, int* src, int count) {
     // function will return safely!
 }
 
-// Scans the 16 expansion slots (0xFC00 - 0xFCFF).
+// Scans the 16 expansion slots (0xFE00 - 0xFEFF).
 // Returns the base address of the peripheral if found, or 0 if not found.
 int* find_peripheral(char* target_name) {
     for (int slot = 0; slot < 16; slot++) {
-        int* base_addr = (int*)(0xFC00 + (slot * 16));
-        char* name_ptr = (char*)(0xFC00 + (slot * 16) + 8);
+        int* base_addr = (int*)(0xFE00 + (slot * 16));
+        char* name_ptr = (char*)(0xFE00 + (slot * 16) + 8);
         
         if (strcmp(name_ptr, target_name) == 0) {
             return base_addr;
@@ -55,7 +55,7 @@ int* find_peripheral(char* target_name) {
 
 
 void send_msg(int slot, char* to, char* body, int len) {
-    int* SLOT_BASE = 0xFC00 + (slot * 16);
+    int* SLOT_BASE = 0xFE00 + (slot * 16);
 
     *MSG_TO = to;
     *MSG_BODY = body;

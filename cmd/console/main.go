@@ -64,6 +64,8 @@ func main() {
 
 	dispatch := func(target string, body []byte) {
 		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+		fmt.Printf("[Message HW as string] To: %s | Body: %s\n", target, string(body))
+
 	}
 
 	// Register peripheral factories for hibernation restore.

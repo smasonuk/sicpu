@@ -56,7 +56,7 @@ int main() {
 
     set_active_bank(0);
 
-    cam[1] = 0x8000;   // offset 0x02: buffer address
+    cam[1] = 0xB600;   // offset 0x02: buffer address
     cam[2] = 128;      // offset 0x04: width
     cam[3] = 128;      // offset 0x06: height
 

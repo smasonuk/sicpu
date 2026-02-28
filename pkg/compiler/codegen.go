@@ -1500,6 +1500,22 @@ func Generate(stmts []Stmt, syms *SymbolTable) (string, error) {
 	// 3. Global Initializations (__init)
 	if hasMain {
 		cg.line("__init:")
+
+		// Initialize Stack Pointer
+		stackTop := uint16(0xB5FE)
+		if _, ok := syms.globals["__STACK_TOP"]; ok {
+			// Find initializer for __STACK_TOP if it's a constant
+			for _, s := range stmts {
+				if decl, ok := s.(*VariableDecl); ok && decl.Name == "__STACK_TOP" {
+					if lit, ok := decl.Init.(*Literal); ok {
+						stackTop = lit.Value
+					}
+				}
+			}
+		}
+		cg.line("    LDI R0, %d", stackTop)
+		cg.line("    STSP R0")
+
 		for _, s := range stmts {
 			if decl, ok := s.(*VariableDecl); ok && decl.Init != nil {
 				// Optimization: If Init is a literal, we handle it in the .DATA section
@@ -1531,6 +1547,19 @@ func Generate(stmts []Stmt, syms *SymbolTable) (string, error) {
 
 	if !hasMain {
 		cg.line("__start:")
+		// Initialize Stack Pointer for headless apps
+		stackTop := uint16(0xB5FE)
+		if _, ok := syms.globals["__STACK_TOP"]; ok {
+			for _, s := range stmts {
+				if decl, ok := s.(*VariableDecl); ok && decl.Name == "__STACK_TOP" {
+					if lit, ok := decl.Init.(*Literal); ok {
+						stackTop = lit.Value
+					}
+				}
+			}
+		}
+		cg.line("    LDI R0, %d", stackTop)
+		cg.line("    STSP R0")
 	}
 
 	// 4. Function Bodies

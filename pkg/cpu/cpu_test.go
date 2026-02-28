@@ -211,7 +211,7 @@ func TestJumps(t *testing.T) {
 }
 
 func TestStack(t *testing.T) {
-	// PUSH: SP starts at 0xFFFE, after push -> 0xFFFC
+	// PUSH: SP starts at 0xB5FE, after push -> 0xB5FC
 	cpu := NewCPU()
 	cpu.Regs[RegA] = 0x1234
 	loadProgram(cpu,
@@ -219,24 +219,24 @@ func TestStack(t *testing.T) {
 		EncodeInstruction(OpHLT, 0, 0, 0),
 	)
 	cpu.Run()
-	if cpu.SP != 0xFFFC {
-		t.Errorf("OpPUSH: expected SP=0xFFFC, got 0x%04X", cpu.SP)
+	if cpu.SP != 0xB5FC {
+		t.Errorf("OpPUSH: expected SP=0xB5FC, got 0x%04X", cpu.SP)
 	}
-	if cpu.Read16(0xFFFC) != 0x1234 {
-		t.Errorf("OpPUSH: expected Memory[0xFFFC]=0x1234, got 0x%04X", cpu.Read16(0xFFFC))
+	if cpu.Read16(0xB5FC) != 0x1234 {
+		t.Errorf("OpPUSH: expected Memory[0xB5FC]=0x1234, got 0x%04X", cpu.Read16(0xB5FC))
 	}
 
 	// POP
 	cpu = NewCPU()
-	cpu.Write16(0xFFFC, 0x5678)
-	cpu.SP = 0xFFFC
+	cpu.Write16(0xB5FC, 0x5678)
+	cpu.SP = 0xB5FC
 	loadProgram(cpu,
 		EncodeInstruction(OpPOP, RegA, 0, 0),
 		EncodeInstruction(OpHLT, 0, 0, 0),
 	)
 	cpu.Run()
-	if cpu.SP != 0xFFFE {
-		t.Errorf("OpPOP: expected SP=0xFFFE, got 0x%04X", cpu.SP)
+	if cpu.SP != 0xB5FE {
+		t.Errorf("OpPOP: expected SP=0xB5FE, got 0x%04X", cpu.SP)
 	}
 	if cpu.Regs[RegA] != 0x5678 {
 		t.Errorf("OpPOP: expected R0=0x5678, got 0x%04X", cpu.Regs[RegA])
@@ -296,9 +296,9 @@ func TestInterrupts(t *testing.T) {
 	if cpu.IE {
 		t.Errorf("Interrupt: expected IE=false inside handler")
 	}
-	// SP should be 0xFFFC (started 0xFFFE, pushed 2 bytes)
-	if cpu.SP != 0xFFFC {
-		t.Errorf("Interrupt: expected SP=0xFFFC, got 0x%04X", cpu.SP)
+	// SP should be 0xB5FC (started 0xB5FE, pushed 2 bytes)
+	if cpu.SP != 0xB5FC {
+		t.Errorf("Interrupt: expected SP=0xB5FC, got 0x%04X", cpu.SP)
 	}
 	// Pushed PC was 0x0002
 	if cpu.Read16(cpu.SP) != 0x0002 {
@@ -306,7 +306,7 @@ func TestInterrupts(t *testing.T) {
 	}
 
 	cpu.Step() // Execute RETI at 0x0012
-	// RETI: PC = Pop() = 0x0002. SP = 0xFFFE. IE = true.
+	// RETI: PC = Pop() = 0x0002. SP = 0xB5FE. IE = true.
 	if cpu.PC != 0x0002 {
 		t.Errorf("RETI: expected PC=0x0002, got 0x%04X", cpu.PC)
 	}
@@ -375,22 +375,22 @@ func TestWriteMem_MMIO(t *testing.T) {
 
 func TestTextVRAM_Write(t *testing.T) {
 	cpu := NewCPU()
-	// Write 16-bit value 0x0041 to address 0xF000 + 5*2 = 0xF00A (word index 5)
-	cpu.WriteMem(0xF00A, 0x0041)
+	// Write 16-bit value 0x0041 to address 0xF600 + 5*2 = 0xF60A (word index 5)
+	cpu.WriteMem(0xF60A, 0x0041)
 	if cpu.TextVRAM[5] != 0x0041 {
 		t.Errorf("TextVRAM_Write: expected TextVRAM[5]=0x0041, got 0x%04X", cpu.TextVRAM[5])
 	}
 	// Main memory at that address should be zero (TextVRAM is separate)
-	if cpu.Memory[0xF00A] != 0 {
-		t.Errorf("TextVRAM_Write: expected Memory[0xF00A]=0, got 0x%02X", cpu.Memory[0xF00A])
+	if cpu.Memory[0xF60A] != 0 {
+		t.Errorf("TextVRAM_Write: expected Memory[0xF60A]=0, got 0x%02X", cpu.Memory[0xF60A])
 	}
 }
 
 func TestTextVRAM_Read(t *testing.T) {
 	cpu := NewCPU()
 	cpu.TextVRAM[1023] = 0x0042
-	// Word index 1023 is at byte address 0xF000 + 1023*2 = 0xF000 + 0x07FE = 0xF7FE
-	val := cpu.ReadMem(0xF7FE)
+	// Word index 1023 is at byte address 0xF600 + 1023*2 = 0xF600 + 0x07FE = 0xFDFE
+	val := cpu.ReadMem(0xFDFE)
 	if val != 0x0042 {
 		t.Errorf("TextVRAM_Read: expected 0x0042, got 0x%04X", val)
 	}
@@ -398,16 +398,16 @@ func TestTextVRAM_Read(t *testing.T) {
 
 func TestTextVRAM_Bounds(t *testing.T) {
 	cpu := NewCPU()
-	// Below VRAM range
-	cpu.WriteMem(0xEFFE, 0x1111)
-	// Above VRAM range (0xF800+)
-	cpu.WriteMem(0xF800, 0x2222)
+	// Below VRAM range (Base RAM)
+	cpu.WriteMem(0xB5FE, 0x1111)
+	// Above VRAM range (Memory above MMIO)
+	cpu.WriteMem(0xFF30, 0x2222)
 
-	if cpu.Read16(0xEFFE) != 0x1111 {
-		t.Errorf("TextVRAM_Bounds: expected 0x1111 at 0xEFFE, got 0x%04X", cpu.Read16(0xEFFE))
+	if cpu.Read16(0xB5FE) != 0x1111 {
+		t.Errorf("TextVRAM_Bounds: expected 0x1111 at 0xB5FE, got 0x%04X", cpu.Read16(0xB5FE))
 	}
-	if cpu.Read16(0xF800) != 0x2222 {
-		t.Errorf("TextVRAM_Bounds: expected 0x2222 at 0xF800, got 0x%04X", cpu.Read16(0xF800))
+	if cpu.Read16(0xFF30) != 0x2222 {
+		t.Errorf("TextVRAM_Bounds: expected 0x2222 at 0xFF30, got 0x%04X", cpu.Read16(0xFF30))
 	}
 	// TextVRAM should be untouched
 	for i := 0; i < 1024; i++ {
@@ -420,10 +420,10 @@ func TestTextVRAM_Bounds(t *testing.T) {
 func TestBankSwitching_Write(t *testing.T) {
 	cpu := NewCPU()
 	cpu.WriteMem(0xFF02, 0)
-	cpu.WriteMem(0x8000, 0xAAAA)
+	cpu.WriteMem(0xB600, 0xAAAA)
 
 	cpu.WriteMem(0xFF02, 1)
-	cpu.WriteMem(0x8000, 0xBBBB)
+	cpu.WriteMem(0xB600, 0xBBBB)
 
 	// GraphicsBanks are now [4][16384]byte; low byte of 0xAAAA is 0xAA
 	if cpu.GraphicsBanks[0][0] != 0xAA {
@@ -435,8 +435,8 @@ func TestBankSwitching_Write(t *testing.T) {
 	if cpu.GraphicsBanks[1][0] != 0xBB {
 		t.Errorf("BankSwitching_Write: expected GraphicsBanks[1][0]=0xBB, got 0x%02X", cpu.GraphicsBanks[1][0])
 	}
-	if cpu.Memory[0x8000] != 0 {
-		t.Errorf("BankSwitching_Write: expected Memory[0x8000]=0, got 0x%02X", cpu.Memory[0x8000])
+	if cpu.Memory[0xB600] != 0 {
+		t.Errorf("BankSwitching_Write: expected Memory[0xB600]=0, got 0x%02X", cpu.Memory[0xB600])
 	}
 }
 
@@ -447,7 +447,7 @@ func TestBankSwitching_Read(t *testing.T) {
 	cpu.GraphicsBanks[1][16382] = 0xCC
 	cpu.GraphicsBanks[1][16383] = 0xCC
 
-	val := cpu.ReadMem(0xBFFE) // 0x8000 + 16382 = 0xBFFE
+	val := cpu.ReadMem(0xF5FE) // 0xB600 + 16382 = 0xF5FE
 	if val != 0xCCCC {
 		t.Errorf("BankSwitching_Read: expected 0xCCCC, got 0x%04X", val)
 	}
@@ -906,14 +906,14 @@ func TestWFI_Wakeup(t *testing.T) {
 func TestStackPointerOps(t *testing.T) {
 	cpu := NewCPU()
 
-	// LDSP R0 - SP defaults to 0xFFFE
+	// LDSP R0 - SP defaults to 0xB5FE
 	loadProgram(cpu,
 		EncodeInstruction(OpLDSP, RegA, 0, 0),
 		EncodeInstruction(OpHLT, 0, 0, 0),
 	)
 	cpu.Run()
-	if cpu.Regs[RegA] != 0xFFFE {
-		t.Errorf("OpLDSP: expected R0=0xFFFE, got 0x%04X", cpu.Regs[RegA])
+	if cpu.Regs[RegA] != 0xB5FE {
+		t.Errorf("OpLDSP: expected R0=0xB5FE, got 0x%04X", cpu.Regs[RegA])
 	}
 
 	// STSP R0
@@ -929,20 +929,20 @@ func TestStackPointerOps(t *testing.T) {
 	}
 
 	// Round-trip: PUSH, LDSP, STSP, POP
-	// SP starts 0xFFFE. After PUSH -> 0xFFFC.
+	// SP starts 0xB5FE. After PUSH -> 0xB5FC.
 	cpu = NewCPU()
 	cpu.Regs[RegA] = 0x1234
 	loadProgram(cpu,
-		EncodeInstruction(OpPUSH, RegA, 0, 0), // Push 0x1234. SP -> 0xFFFC
-		EncodeInstruction(OpLDSP, RegB, 0, 0), // R1 = SP (0xFFFC)
-		EncodeInstruction(OpSTSP, RegB, 0, 0), // SP = R1 (0xFFFC)
+		EncodeInstruction(OpPUSH, RegA, 0, 0), // Push 0x1234. SP -> 0xB5FC
+		EncodeInstruction(OpLDSP, RegB, 0, 0), // R1 = SP (0xB5FC)
+		EncodeInstruction(OpSTSP, RegB, 0, 0), // SP = R1 (0xB5FC)
 		EncodeInstruction(OpPOP, RegC, 0, 0),  // Pop into R2. Should be 0x1234.
 		EncodeInstruction(OpHLT, 0, 0, 0),
 	)
 	cpu.Run()
 
-	if cpu.SP != 0xFFFE {
-		t.Errorf("RoundTrip: expected SP=0xFFFE, got 0x%04X", cpu.SP)
+	if cpu.SP != 0xB5FE {
+		t.Errorf("RoundTrip: expected SP=0xB5FE, got 0x%04X", cpu.SP)
 	}
 	if cpu.Regs[RegC] != 0x1234 {
 		t.Errorf("RoundTrip: expected R2=0x1234, got 0x%04X", cpu.Regs[RegC])
@@ -1214,5 +1214,52 @@ func TestSignedOps(t *testing.T) {
 	c.Run()
 	if c.PC != 0x0008 { // HLT at 0x0006 executed -> PC=0x0008
 		t.Errorf("OpJC not taken: expected PC=0x0008, got 0x%04X", c.PC)
+	}
+}
+
+func TestMemoryMapBoundaries(t *testing.T) {
+	c := NewCPU()
+
+	// 1. Graphics VRAM (0xB600 - 0xF5FF)
+	c.WriteByte(0xB600, 0x42)
+	if c.GraphicsBanks[c.CurrentBank][0] != 0x42 {
+		t.Errorf("Graphics VRAM: expected 0x42 at index 0, got 0x%02X", c.GraphicsBanks[c.CurrentBank][0])
+	}
+
+	// 2. Text VRAM (0xF600 - 0xFDFF)
+	c.Write16(0xF600, 0x1234)
+	if c.TextVRAM[0] != 0x1234 {
+		t.Errorf("Text VRAM: expected 0x1234 at index 0, got 0x%04X", c.TextVRAM[0])
+	}
+
+	// 3. Base RAM (0xB5FF)
+	c.WriteByte(0xB5FF, 0x77)
+	if c.Memory[0xB5FF] != 0x77 {
+		t.Errorf("Base RAM: expected 0x77 at 0xB5FF, got 0x%02X", c.Memory[0xB5FF])
+	}
+}
+
+type dummyPeripheral struct {
+	lastVal uint16
+}
+func (p *dummyPeripheral) Read16(offset uint16) uint16 { return p.lastVal }
+func (p *dummyPeripheral) Write16(offset uint16, val uint16) { p.lastVal = val }
+func (p *dummyPeripheral) Step() {}
+func (p *dummyPeripheral) Type() string { return "Dummy" }
+
+func TestPeripheralRouting(t *testing.T) {
+	c := NewCPU()
+	p := &dummyPeripheral{}
+	c.MountPeripheral(0, p)
+
+	// Expansion Bus starts at 0xFE00. Slot 0 is 0xFE00-0xFE0F.
+	c.Write16(0xFE00, 0x1337)
+	if p.lastVal != 0x1337 {
+		t.Errorf("Peripheral Routing: expected 0x1337, got 0x%04X", p.lastVal)
+	}
+	
+	val := c.Read16(0xFE00)
+	if val != 0x1337 {
+		t.Errorf("Peripheral Reading: expected 0x1337, got 0x%04X", val)
 	}
 }

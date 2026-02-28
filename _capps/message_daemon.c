@@ -35,7 +35,7 @@ int vfs_delete(int* filename) {
 
 int RECV_SLOT = -1;
 int* INT_MASK = 0xFF09;
-int* MMIO_SLOT_BASE = 0xFC00;
+int* MMIO_SLOT_BASE = 0xFE00;
 
 void isr() {
     int pending = *INT_MASK;
@@ -98,7 +98,7 @@ void isr() {
                 print("Error: INBOX.MSG or SENDER.MSG not found or invalid\n");
             }
 
-            int* slot_addr = 0xFC00 + (RECV_SLOT * 16);
+            int* slot_addr = 0xFE00 + (RECV_SLOT * 16);
             *slot_addr = 1;
 
             // Only clear our interrupt
@@ -117,7 +117,7 @@ int main() {
     }
 
     int address = (int)slot_ptr;
-    int offset = address - 0xFC00;
+    int offset = address - 0xFE00;
     RECV_SLOT = offset / 16;
 
     if (RECV_SLOT < 0) { RECV_SLOT = 0; }

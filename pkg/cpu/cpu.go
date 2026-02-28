@@ -271,7 +271,7 @@ var pico8Palette = [16]uint16{
 // if non-empty, existing files from that directory are loaded into the VFS on startup.
 func NewCPU(storagePath ...string) *CPU {
 	c := &CPU{
-		SP:          0xFFFE,
+		SP:          0xB5FE,
 		TextOverlay: true,
 		Disk:        vfs.NewVirtualDisk(),
 	}
@@ -309,9 +309,9 @@ func (c *CPU) PushKey(val uint16) {
 // Read16 reads a little-endian uint16 from addr and addr+1.
 // MMIO registers (0xFF00-0xFF1F) are read from dedicated struct fields.
 func (c *CPU) Read16(addr uint16) uint16 {
-	if addr >= 0xFC00 && addr <= 0xFCFF {
-		slot := uint8((addr - 0xFC00) / 16)
-		offset := (addr - 0xFC00) % 16
+	if addr >= 0xFE00 && addr <= 0xFEFF {
+		slot := uint8((addr - 0xFE00) / 16)
+		offset := (addr - 0xFE00) % 16
 		if c.Peripherals[slot] != nil {
 			return c.Peripherals[slot].Read16(offset)
 		}
@@ -356,9 +356,9 @@ func (c *CPU) Read16(addr uint16) uint16 {
 // MMIO registers occupy 0xFF00-0xFF1F; addresses above that (0xFF20+) are normal RAM
 // and are used for the stack (which starts at 0xFFFE and grows down).
 func (c *CPU) Write16(addr uint16, val uint16) {
-	if addr >= 0xFC00 && addr <= 0xFCFF {
-		slot := uint8((addr - 0xFC00) / 16)
-		offset := (addr - 0xFC00) % 16
+	if addr >= 0xFE00 && addr <= 0xFEFF {
+		slot := uint8((addr - 0xFE00) / 16)
+		offset := (addr - 0xFE00) % 16
 		if c.Peripherals[slot] != nil {
 			c.Peripherals[slot].Write16(offset, val)
 		}
@@ -375,8 +375,8 @@ func (c *CPU) Write16(addr uint16, val uint16) {
 
 // ReadByte reads a single byte from addr, with MMIO and VRAM interception.
 func (c *CPU) ReadByte(addr uint16) byte {
-	// Expansion Bus: 0xFC00-0xFCFF
-	if addr >= 0xFC00 && addr <= 0xFCFF {
+	// Expansion Bus: 0xFE00-0xFEFF
+	if addr >= 0xFE00 && addr <= 0xFEFF {
 		val := c.Read16(addr & 0xFFFE)
 		if addr%2 == 0 {
 			return byte(val & 0xFF)
@@ -384,18 +384,18 @@ func (c *CPU) ReadByte(addr uint16) byte {
 		return byte(val >> 8)
 	}
 
-	// Text VRAM: 0xF000-0xF7FF (1024 uint16 cells × 2 bytes each)
-	if addr >= 0xF000 && addr <= 0xF7FF {
-		offset := addr - 0xF000
+	// Text VRAM: 0xF600-0xFDFF (1024 uint16 cells × 2 bytes each)
+	if addr >= 0xF600 && addr <= 0xFDFF {
+		offset := addr - 0xF600
 		wordIndex := offset / 2
 		if offset%2 == 0 {
 			return byte(c.TextVRAM[wordIndex] & 0xFF)
 		}
 		return byte(c.TextVRAM[wordIndex] >> 8)
 	}
-	// Graphics banks: 0x8000-0xBFFF
-	if addr >= 0x8000 && addr <= 0xBFFF {
-		return c.GraphicsBanks[c.CurrentBank][addr-0x8000]
+	// Graphics banks: 0xB600-0xF5FF
+	if addr >= 0xB600 && addr <= 0xF5FF {
+		return c.GraphicsBanks[c.CurrentBank][addr-0xB600]
 	}
 	// MMIO reads
 	if addr == 0xFF03 {
@@ -430,8 +430,8 @@ func (c *CPU) ReadByte(addr uint16) byte {
 
 // WriteByte writes a single byte to addr, with MMIO and VRAM interception.
 func (c *CPU) WriteByte(addr uint16, val byte) {
-	// Expansion Bus: 0xFC00-0xFCFF
-	if addr >= 0xFC00 && addr <= 0xFCFF {
+	// Expansion Bus: 0xFE00-0xFEFF
+	if addr >= 0xFE00 && addr <= 0xFEFF {
 		wordAddr := addr & 0xFFFE
 		current := c.Read16(wordAddr)
 		var newVal uint16
@@ -444,9 +444,9 @@ func (c *CPU) WriteByte(addr uint16, val byte) {
 		return
 	}
 
-	// Text VRAM: 0xF000-0xF7FF
-	if addr >= 0xF000 && addr <= 0xF7FF {
-		offset := addr - 0xF000
+	// Text VRAM: 0xF600-0xFDFF
+	if addr >= 0xF600 && addr <= 0xFDFF {
+		offset := addr - 0xF600
 		wordIndex := offset / 2
 		if offset%2 == 0 {
 			c.TextVRAM[wordIndex] = (c.TextVRAM[wordIndex] & 0xFF00) | uint16(val)
@@ -455,9 +455,9 @@ func (c *CPU) WriteByte(addr uint16, val byte) {
 		}
 		return
 	}
-	// Graphics banks: 0x8000-0xBFFF
-	if addr >= 0x8000 && addr <= 0xBFFF {
-		c.GraphicsBanks[c.CurrentBank][addr-0x8000] = val
+	// Graphics banks: 0xB600-0xF5FF
+	if addr >= 0xB600 && addr <= 0xF5FF {
+		c.GraphicsBanks[c.CurrentBank][addr-0xB600] = val
 		return
 	}
 	// MMIO byte writes (for completeness; 16-bit MMIO handled via handleMMIOWrite16)
@@ -788,7 +788,7 @@ func (c *CPU) handleVFSCommand(val uint16) {
 
 		// Reset Registers
 		c.PC = 0
-		c.SP = 0xFFFE
+		c.SP = 0xB5FE
 		c.Z = false
 		c.N = false
 		c.C = false

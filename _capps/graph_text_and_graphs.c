@@ -4,8 +4,8 @@ int main() {
     // 1. Define MMIO Pointers
     int* video_ctrl = 0xFF05;
     int* active_bank = 0xFF02;
-    int* vram_base = 0x8000;
-    int* text_base = 0xF000;
+    int* vram_base = 0xB600;
+    int* text_base = 0xF600;
 
     // 2. Enable Text (1) + Graphics (2) + Buffered Mode (4) = 7
     *video_ctrl = 7;

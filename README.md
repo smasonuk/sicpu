@@ -19,20 +19,24 @@ A custom 16-bit virtual CPU, assembler, and C-subset compiler written in Go.
 
 ## Memory Map
 
-All addresses are **word** addresses (each word = 2 bytes). The CPU is word-addressed, so address `0x0001` refers to the second 16-bit word in memory.
+The CPU is **byte-addressed**. Every instruction is 2 bytes long, and memory-mapped I/O is accessed via specific byte addresses.
 
-| Memory Segment     | Word Range            | Byte Equivalent       | Size (words) | Owner                    |
-|--------------------|-----------------------|-----------------------|--------------|--------------------------|
-| **System/Vectors** | `0x0000` – `0x000F`   | `0x0000` – `0x001F`   | 16           | Compiler / Assembler     |
-| **Code & Data**    | `0x0010` – `0x3FFF`   | `0x0020` – `0x7FFF`   | 16,368       | Compiler (dynamic)       |
-| **Graphics VRAM**  | `0x4000` – `0x5FFF`   | `0x8000` – `0xBFFF`   | 8,192        | Hardware (`cpu.go`)      |
-| **General RAM**    | `0x6000` – `0x77FF`   | `0xC000` – `0xEFFF`   | 6,144        | Free RAM                 |
-| **Text VRAM**      | `0x7800` – `0x7BFF`   | `0xF000` – `0xF7FF`   | 1,024        | Hardware (`cpu.go`)      |
-| **Upper RAM**      | `0x7C00` – `0x7F7F`   | `0xF800` – `0xFEFF`   | 896          | Free RAM (used by stack) |
-| **MMIO**           | `0x7F80` – `0x7F8F`   | `0xFF00` – `0xFF1F`   | 16           | Hardware (`cpu.go`)      |
-| **Stack (top)**    | `0x7F90` – `0x7FFF`   | `0xFF20` – `0xFFFF`   | 112          | SP grows down from top   |
+Here is the updated memory map table with the size converted to bytes.
 
-**Interrupt vector:** The CPU jumps to address `0x0010` (byte `0x0020`) when an interrupt fires. Place your ISR there or use `.ORG 0x0010`.
+| Memory Segment | Word Range | Byte Equivalent | Size (Bytes) | Owner |
+| --- | --- | --- | --- | --- |
+| **System/Vectors** | `0x0000` – `0x0007` | `0x0000` – `0x000F` | 16 B | Compiler / Assembler |
+| **Base RAM** | `0x0008` – `0x5AFF` | `0x0010` – `0xB5FF` | 46,576 B | Code / Data / Stack |
+| **Graphics VRAM** | `0x5B00` – `0x7AFF` | `0xB600` – `0xF5FF` | 16,384 B | Hardware (`cpu.go`) |
+| **Text VRAM** | `0x7B00` – `0x7EFF` | `0xF600` – `0xFDFF` | 2,048 B | Hardware (`cpu.go`) |
+| **Expansion Bus** | `0x7F00` – `0x7F7F` | `0xFE00` – `0xFEFF` | 256 B | Peripherals |
+| **MMIO** | `0x7F80` – `0x7F97` | `0xFF00` – `0xFF2F` | 48 B | Hardware (`cpu.go`) |
+| **Reserved** | `0x7F98` – `0x7FFF` | `0xFF30` – `0xFFFF` | 208 B | Reserved |
+
+
+**Interrupt vector:** The CPU jumps to address `0x0010` when an interrupt fires. Place your ISR there or use `.ORG 0x0010`.
+
+**Repurposing VRAM:** When bitmap graphics or text overlay features are disabled, the corresponding VRAM ranges (`0xB600` onwards) can be used as general-purpose RAM by standard applications.
 
 ---
 
@@ -70,7 +74,7 @@ go build -o gocpu .
 After a run completes, the CPU state is printed:
 
 ```
-run complete (program.bin): PC=0x0010 SP=0xFFFE Z=false N=false R0=0x0007 R1=0x0000 R2=0x0000 R3=0x0000
+run complete (program.bin): PC=0x0010 SP=0xB5FE Z=false N=false R0=0x0007 R1=0x0000 R2=0x0000 R3=0x0000
 ```
 
 ---
@@ -87,11 +91,11 @@ go run ./cmd/desktop
 
 #### Text Mode
 
-The text VRAM consists of 1,024 words starting at address `0xF000`. It renders as a 64-column × 16-row grid (default), or a 32-column × 32-row grid.
+The text VRAM consists of 1,024 words starting at address `0xF600`. It renders as a 64-column × 16-row grid (default), or a 32-column × 32-row grid.
 
-- `0xF000` → (col=0, row=0)
-- `0xF001` → (col=1, row=0)
-- `0xF040` → (col=0, row=1)  *(offset = 64 words per row)*
+- `0xF600` → (col=0, row=0)
+- `0xF601` → (col=1, row=0)  *(Note: Text VRAM uses word-sized cells, increment by 2 for next byte offset)*
+- `0xF680` → (col=0, row=1)  *(offset = 64 words/128 bytes per row)*
 
 Write an ASCII code as a 16-bit word to the cell address to display a character.
 
@@ -99,8 +103,8 @@ Write an ASCII code as a 16-bit word to the cell address to display a character.
 
 128×128 pixels, 16 colors (Pico-8-inspired palette), 4-bit packed per nibble.
 
-- **VRAM base:** `0x8000` – `0x9FFF` (4-bit packed: 4 pixels per word)
-- **8bpp unpacked mode:** each word stores one 8-bit color index; enable with `VIDEO_CTRL` bit 3
+- **VRAM base:** `0xB600` – `0xD5FF` (4-bit packed: 4 pixels per word)
+- **8bpp unpacked mode:** each byte stores one 8-bit color index; enable with `VIDEO_CTRL` bit 3
 - **Color Depth:** 4-bit (16 colors) in default mode, 8-bit (256 colors) in 8bpp mode
 - **Pixel layout (4bpp):**
   - Bits 0–3: pixel `n`
@@ -134,7 +138,7 @@ Instructions that take an immediate value (label or literal) store it in the **n
 | R2   | 2     | General purpose; used as frame pointer by compiler |
 | R3   | 3     | General purpose; scratch register for compiler     |
 | PC   | —     | Program counter                                    |
-| SP   | —     | Stack pointer; initialised to `0xFFFE`, grows down |
+| SP   | —     | Stack pointer; initialised to `0xB5FE`, grows down |
 
 **Flags:**
 - **Z** — Zero: set when an arithmetic/logic result is 0
@@ -291,16 +295,16 @@ All MMIO ports occupy `0xFF00`–`0xFF1F`. Use `ST [Rport], Rdata` to write and 
 
 ## Peripherals and Expansion Bus
 
-The CPU supports up to 16 peripheral devices connected via the **Expansion Bus**, which occupies the MMIO address range `0xFC00`–`0xFCFF`. Each slot is 16 bytes wide.
+The CPU supports up to 16 peripheral devices connected via the **Expansion Bus**, which occupies the MMIO address range `0xFE00`–`0xFEFF`. Each slot is 16 bytes wide.
 
 ### Address Mapping
 
 | Slot | Address Range | Size (bytes) | Description                |
 |------|---------------|--------------|----------------------------|
-| 0    | `0xFC00`–`0xFC0F` | 16    | Peripheral slot 0           |
-| 1    | `0xFC10`–`0xFC1F` | 16    | Peripheral slot 1           |
+| 0    | `0xFE00`–`0xFE0F` | 16    | Peripheral slot 0           |
+| 1    | `0xFE10`–`0xFE1F` | 16    | Peripheral slot 1           |
 | ...  | ...           | ...          | ...                         |
-| 15   | `0xFCF0`–`0xFCFF` | 16    | Peripheral slot 15          |
+| 15   | `0xFEF0`–`0xFEFF` | 16    | Peripheral slot 15          |
 
 Each slot can hold a peripheral implementing the `Peripheral` interface.
 
@@ -327,15 +331,15 @@ Peripherals are accessed like any other MMIO device via `LD`/`ST` instructions:
 
 ```asm
 ; Read from peripheral in slot 2, offset 0x04
-LD  R0, [0xFC24]     ; 0xFC20 + 0x04
+LD  R0, [0xFE24]     ; 0xFE20 + 0x04
 
 ; Write to peripheral in slot 2, offset 0x00
 LDI R1, 42
-ST  [0xFC20], R1     ; 0xFC20 + 0x00
+ST  [0xFE20], R1     ; 0xFE20 + 0x00
 
 ; Byte access
-LDB R0, [0xFC21]     ; Read low byte from slot 2, offset 0x00
-STB [0xFC21], R1     ; Write low byte to slot 2, offset 0x00
+LDB R0, [0xFE21]     ; Read low byte from slot 2, offset 0x00
+STB [0xFE21], R1     ; Write low byte to slot 2, offset 0x00
 ```
 
 ### Built-in Peripherals
@@ -357,13 +361,13 @@ A simple **Direct Memory Access** (DMA) controller for testing hardware transfer
 ```asm
 ; Mount DMA in slot 1 and transfer 16 bytes to address 0x1000
 LDI R0, 0x1000      ; target address
-ST  [0xFC12], R0    ; write to slot 1, offset 0x02
+ST  [0xFE12], R0    ; write to slot 1, offset 0x02
 
 LDI R0, 16          ; length
-ST  [0xFC14], R0    ; write to slot 1, offset 0x04
+ST  [0xFE14], R0    ; write to slot 1, offset 0x04
 
 LDI R0, 1           ; trigger command
-ST  [0xFC10], R0    ; write to slot 1, offset 0x00 (fires interrupt)
+ST  [0xFE10], R0    ; write to slot 1, offset 0x00 (fires interrupt)
 ```
 
 The DMA peripheral fills the target region with `0xAA` bytes and triggers a **peripheral interrupt** (slot 1, bit mask `0x0002`) when complete.
@@ -397,16 +401,16 @@ BODY: .STRING "hello"
 ; Configure and send
 .ORG 0x0100
     LDI R0, 0x1000      ; target address
-    ST  [0xFC02], R0
+    ST  [0xFE02], R0
 
     LDI R0, 0x1010      ; body address
-    ST  [0xFC04], R0
+    ST  [0xFE04], R0
 
     LDI R0, 5           ; body length
-    ST  [0xFC06], R0
+    ST  [0xFE06], R0
 
     LDI R0, 1           ; send
-    ST  [0xFC00], R0
+    ST  [0xFE00], R0
 ```
 
 Output (host stdout):
@@ -670,9 +674,10 @@ arr[0] = 5;
 int* p = &x;           // address-of
 int v = *p;            // dereference
 *p = 99;               // dereference-assign
-byte* bp = 0x8000;     // raw address cast to byte pointer
+byte* bp = 0xB600;     // raw address cast to byte pointer (Graphics VRAM)
 
-//  Arithmetic 
+//  Stack Configuration
+int __STACK_TOP = 0xFDFE; // Optional: Override default SP (0xB5FE) to reclaim VRAM as RAM
 int a = x + y;
 int b = x - y;
 int c = x * y;

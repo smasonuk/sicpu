@@ -3,7 +3,7 @@
 // MMIO Registers
 int* video_ctrl = 0xFF05;
 int* active_bank = 0xFF02;
-int* vram_base  = 0x8000;
+int* vram_base  = 0xB600;
 
 void main() {
 

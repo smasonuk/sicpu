@@ -13,7 +13,7 @@ int set_resolution(int mode) {
 // Write character c to VRAM at grid position (x, y).
 // Reads the current column count from the config port to compute the offset.
 int print_at(int x, int y, int c) {
-    int* vram = 0xF000;
+    int* vram = 0xF600;
     int* config_port = 0xFF03;
     int cols = 32;
     if (*config_port == 1) { cols = 64; }

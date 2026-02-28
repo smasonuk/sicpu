@@ -100,6 +100,7 @@ func (m *MessageSender) sendMessage() {
 	if m.dispatch != nil {
 		m.dispatch(target, body)
 	} else {
-		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+		fmt.Printf("[Message HW] To1: %s | Body: %x\n", target, body)
+
 	}
 }

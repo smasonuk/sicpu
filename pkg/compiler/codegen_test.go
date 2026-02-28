@@ -760,3 +760,47 @@ func TestDeadCodeElimination(t *testing.T) {
 		t.Errorf("Expected code NOT to contain 'dead_func:', but it did.")
 	}
 }
+
+func TestGenerate_StackPointer(t *testing.T) {
+	t.Run("default stack pointer", func(t *testing.T) {
+		syms := NewSymbolTable()
+		stmts := []Stmt{
+			&FunctionDecl{Name: "main", Body: &BlockStmt{}},
+		}
+		// stmts must have at least main to generate __init where SP is set
+		code, err := Generate(stmts, syms)
+		if err != nil {
+			t.Fatalf("Generate failed: %v", err)
+		}
+		assertContains(t, code, "LDI R0, 46590") // 0xB5FE
+		assertContains(t, code, "STSP R0")
+	})
+
+	t.Run("custom stack pointer __STACK_TOP", func(t *testing.T) {
+		syms := NewSymbolTable()
+		stmts := []Stmt{
+			&VariableDecl{Name: "__STACK_TOP", Init: &Literal{Value: 0xFDFE}},
+			&FunctionDecl{Name: "main", Body: &BlockStmt{}},
+		}
+		code, err := Generate(stmts, syms)
+		if err != nil {
+			t.Fatalf("Generate failed: %v", err)
+		}
+		assertContains(t, code, "LDI R0, 65022") // 0xFDFE
+		assertContains(t, code, "STSP R0")
+	})
+
+	t.Run("headless default stack pointer", func(t *testing.T) {
+		syms := NewSymbolTable()
+		stmts := []Stmt{
+			&FunctionDecl{Name: "not_main", Body: &BlockStmt{}},
+		}
+		code, err := Generate(stmts, syms)
+		if err != nil {
+			t.Fatalf("Generate failed: %v", err)
+		}
+		assertContains(t, code, "__start:")
+		assertContains(t, code, "LDI R0, 46590") // 0xB5FE
+		assertContains(t, code, "STSP R0")
+	})
+}
