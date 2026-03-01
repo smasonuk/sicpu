@@ -3,6 +3,11 @@
 #define MSGSNDR_LEN_OFFSET  3*2
 #define MSGSNDR_SEND        1
 
+int send_text_message(char* send_to_address, char* message) {
+    int len = strlen(message);
+    return send_message(send_to_address, (int)message, len);
+}
+
 int send_message(char* send_to_address, int image_buffer_address, int image_size) {
     int* sender = find_peripheral("MSGSNDR");
     if (sender == 0) {
@@ -22,4 +27,6 @@ int send_message(char* send_to_address, int image_buffer_address, int image_size
 
     int* send_cmd = (int*)sender;
     *send_cmd = MSGSNDR_SEND; 
+
+    return 0;
 }

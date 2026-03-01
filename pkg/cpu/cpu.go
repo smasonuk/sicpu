@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"gocpu/pkg/vfs"
 )
@@ -132,6 +133,11 @@ type CPU struct {
 
 	Peripherals       [16]Peripheral
 	PeripheralIntMask uint16
+
+	MessageDevices map[string]MessageDevice
+	MessagePusher  func(target string, body []byte) error
+
+	NonLocalMessages func(to string, body []byte)
 }
 
 type CPUState struct {
@@ -227,6 +233,10 @@ func (c *CPU) restoreState(state CPUState) {
 	c.PeripheralIntMask = state.PeripheralIntMask
 }
 
+func (c *CPU) SetNonLocalMessages(fn func(to string, body []byte)) {
+	c.NonLocalMessages = fn
+}
+
 func (c *CPU) MountPeripheral(slot uint8, p Peripheral) {
 	if slot < 16 {
 		c.Peripherals[slot] = p
@@ -271,9 +281,10 @@ var pico8Palette = [16]uint16{
 // if non-empty, existing files from that directory are loaded into the VFS on startup.
 func NewCPU(storagePath ...string) *CPU {
 	c := &CPU{
-		SP:          0xB5FE,
-		TextOverlay: true,
-		Disk:        vfs.NewVirtualDisk(),
+		SP:             0xB5FE,
+		TextOverlay:    true,
+		Disk:           vfs.NewVirtualDisk(),
+		MessageDevices: make(map[string]MessageDevice),
 	}
 	for i, v := range pico8Palette {
 		c.Palette[i] = v
@@ -1092,6 +1103,39 @@ func (c *CPU) Run() {
 	for !c.Halted {
 		c.Step()
 	}
+}
+
+// MountMessageDevice attaches a message device to the CPU's message bus.
+func (c *CPU) MountMessageDevice(address string, dev MessageDevice) {
+	c.MessageDevices[address] = dev
+}
+
+// DispatchMessage routes a message to the target device on the message bus.
+func (c *CPU) DispatchMessage(target string, body []byte) {
+	dev, ok := c.MessageDevices[target]
+	if !ok {
+		if !strings.HasSuffix(target, "@local") {
+			if c.NonLocalMessages != nil {
+				c.NonLocalMessages(target, body)
+				return
+			} else {
+				fmt.Printf("[Message Bus] Non local message, but no event set up: %s\n", target)
+				return
+			}
+		}
+
+		fmt.Printf("[Message Bus] Unroutable target: %s\n", target)
+		return
+	}
+
+	reply := func(t string, b []byte) error {
+		if c.MessagePusher == nil {
+			return errors.New("MessagePusher is not set")
+		}
+		return c.MessagePusher(t, b)
+	}
+
+	dev.HandleMessage(reply, "system@local", body)
 }
 
 func EncodeInstruction(opcode, regA, regB, regC uint16) uint16 {
