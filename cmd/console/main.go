@@ -63,11 +63,11 @@ func main() {
 		print("Generated Assembly:\n", *asm, "\n")
 	}
 
-	dispatch := func(target string, body []byte) {
-		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
-		fmt.Printf("[Message HW as string] To: %s | Body: %s\n", target, string(body))
+	// dispatch := func(target string, body []byte) {
+	// 	fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+	// 	fmt.Printf("[Message HW as string] To: %s | Body: %s\n", target, string(body))
 
-	}
+	// }
 
 	// Register peripheral factories for hibernation restore.
 	cpu.RegisterPeripheral(peripherals.MessagePeripheralType, func(c *cpu.CPU, slot uint8) cpu.Peripheral {
@@ -82,6 +82,11 @@ func main() {
 	})
 
 	vm := cpu.NewCPU("gocpu_vfs")
+	vm.SetNonLocalMessages(func(target string, body []byte) {
+		fmt.Printf("[Message HW] To: %s | Body: %x\n", target, body)
+		fmt.Printf("[Message HW as string] To: %s | Body: %s\n", target, string(body))
+
+	})
 
 	msgReceiver := peripherals.NewMessageReceiver(vm, 1)
 	vm.MessagePusher = msgReceiver.PushMessage

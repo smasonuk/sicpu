@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"gocpu/pkg/vfs"
 )
@@ -135,6 +136,8 @@ type CPU struct {
 
 	MessageDevices map[string]MessageDevice
 	MessagePusher  func(target string, body []byte) error
+
+	NonLocalMessages func(to string, body []byte)
 }
 
 type CPUState struct {
@@ -228,6 +231,10 @@ func (c *CPU) restoreState(state CPUState) {
 	c.mathRes = state.MathRes
 	c.mathRemainder = state.MathRemainder
 	c.PeripheralIntMask = state.PeripheralIntMask
+}
+
+func (c *CPU) SetNonLocalMessages(fn func(to string, body []byte)) {
+	c.NonLocalMessages = fn
 }
 
 func (c *CPU) MountPeripheral(slot uint8, p Peripheral) {
@@ -1107,6 +1114,16 @@ func (c *CPU) MountMessageDevice(address string, dev MessageDevice) {
 func (c *CPU) DispatchMessage(target string, body []byte) {
 	dev, ok := c.MessageDevices[target]
 	if !ok {
+		if !strings.HasSuffix(target, "@local") {
+			if c.NonLocalMessages != nil {
+				c.NonLocalMessages(target, body)
+				return
+			} else {
+				fmt.Printf("[Message Bus] Non local message, but no event set up: %s\n", target)
+				return
+			}
+		}
+
 		fmt.Printf("[Message Bus] Unroutable target: %s\n", target)
 		return
 	}
