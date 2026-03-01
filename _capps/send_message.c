@@ -3,7 +3,7 @@
 
 int main() {
     int slot = find_peripheral("MSGSNDR");
-    char* target = "Central Command";
+    char* target = "simon@earth";
     char* payload = "Ground control to major Tom";
     int len = strlen(payload);
 

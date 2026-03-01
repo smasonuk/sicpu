@@ -56,7 +56,7 @@ func TestSendMessageIntegration(t *testing.T) {
 	output := buf.String()
 
 	// 8. Assertions
-	expectedMessage := "[Message HW] To: Central Command | Body: Ground control to major Tom\n"
+	expectedMessage := "[Message HW] To: simon@earth | Body: Ground control to major Tom\nMessage sent!\n"
 	if !strings.Contains(output, expectedMessage) {
 		t.Errorf("Expected peripheral output %q, got %q", expectedMessage, output)
 	}

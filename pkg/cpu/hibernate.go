@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,28 +16,29 @@ import (
 
 // humanReadableState is the JSON-serializable snapshot of CPU control state.
 type humanReadableState struct {
-	Regs               [8]uint16      `json:"regs"`
-	PC                 uint16         `json:"pc"`
-	SP                 uint16         `json:"sp"`
-	Z                  bool           `json:"z"`
-	N                  bool           `json:"n"`
-	C                  bool           `json:"c"`
-	IE                 bool           `json:"ie"`
-	Waiting            bool           `json:"waiting"`
-	Halted             bool           `json:"halted"`
-	InterruptPending   bool           `json:"interrupt_pending"`
-	CallDepth          int            `json:"call_depth"`
-	PeripheralIntMask  uint16         `json:"peripheral_int_mask"`
-	GraphicsEnabled    bool           `json:"graphics_enabled"`
-	TextOverlay        bool           `json:"text_overlay"`
-	BufferedMode       bool           `json:"buffered_mode"`
-	ColorMode8bpp      bool           `json:"color_mode_8bpp"`
-	TextResolutionMode uint16         `json:"text_resolution_mode"`
-	CurrentBank        uint16         `json:"current_bank"`
-	DisplayBank        uint16         `json:"display_bank"`
-	Palette            [256]uint16    `json:"palette"`
-	PaletteIndex       uint16         `json:"palette_index"`
-	MountedPeripherals map[int]string `json:"mounted_peripherals"`
+	Regs               [8]uint16         `json:"regs"`
+	PC                 uint16            `json:"pc"`
+	SP                 uint16            `json:"sp"`
+	Z                  bool              `json:"z"`
+	N                  bool              `json:"n"`
+	C                  bool              `json:"c"`
+	IE                 bool              `json:"ie"`
+	Waiting            bool              `json:"waiting"`
+	Halted             bool              `json:"halted"`
+	InterruptPending   bool              `json:"interrupt_pending"`
+	CallDepth          int               `json:"call_depth"`
+	PeripheralIntMask  uint16            `json:"peripheral_int_mask"`
+	GraphicsEnabled    bool              `json:"graphics_enabled"`
+	TextOverlay        bool              `json:"text_overlay"`
+	BufferedMode       bool              `json:"buffered_mode"`
+	ColorMode8bpp      bool              `json:"color_mode_8bpp"`
+	TextResolutionMode uint16            `json:"text_resolution_mode"`
+	CurrentBank        uint16            `json:"current_bank"`
+	DisplayBank        uint16            `json:"display_bank"`
+	Palette            [256]uint16       `json:"palette"`
+	PaletteIndex       uint16            `json:"palette_index"`
+	MountedPeripherals map[int]string    `json:"mounted_peripherals"`
+	MessageDevices     map[string]string `json:"message_devices"` // Address -> Type
 }
 
 // vfsFileDescriptor holds per-file metadata for the VFS snapshot.
@@ -82,11 +84,23 @@ func (c *CPU) HibernateToBytes() ([]byte, error) {
 		Palette:            c.Palette,
 		PaletteIndex:       c.PaletteIndex,
 		MountedPeripherals: make(map[int]string),
+		MessageDevices:     make(map[string]string),
 	}
 
 	for i, p := range c.Peripherals {
 		if p != nil {
 			state.MountedPeripherals[i] = p.Type()
+		}
+	}
+
+	for addr, dev := range c.MessageDevices {
+		state.MessageDevices[addr] = dev.Type()
+		if sp, ok := dev.(StatefulMessageDevice); ok {
+			data := sp.SaveState()
+			filename := "msgdev_" + hex.EncodeToString([]byte(addr)) + ".bin"
+			if err := writeZipEntry(zw, filename, data); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -220,6 +234,23 @@ func (c *CPU) RestoreFromBytes(data []byte) error {
 	c.DisplayBank = state.DisplayBank
 	c.Palette = state.Palette
 	c.PaletteIndex = state.PaletteIndex
+
+	c.MessageDevices = make(map[string]MessageDevice)
+	for addr, typeName := range state.MessageDevices {
+		factory, ok := msgDeviceRegistry[typeName]
+		if ok {
+			dev := factory()
+			c.MessageDevices[addr] = dev
+			if sp, ok := dev.(StatefulMessageDevice); ok {
+				filename := "msgdev_" + hex.EncodeToString([]byte(addr)) + ".bin"
+				if binData, err := readZipEntry(fileMap, filename); err == nil {
+					if err := sp.LoadState(binData); err != nil {
+						return fmt.Errorf("load message device %s state: %w", addr, err)
+					}
+				}
+			}
+		}
+	}
 
 	//  2. memory.bin
 	if memData, err := readZipEntry(fileMap, "memory.bin"); err == nil {
